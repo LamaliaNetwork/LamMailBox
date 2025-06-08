@@ -1,0 +1,232 @@
+settings:
+  max-mails-per-player: 54
+  admin-mail-expire-days: 7
+  admin-permission: 'securemailbox.admin'
+  join-notification: true
+  permissions:
+    open: 'securemailbox.open'
+    open-others: 'securemailbox.open.others'
+    compose: 'securemailbox.compose'
+    add-items: 'securemailbox.items'
+    reload: 'securemailbox.reload'
+
+  notification:
+    title-enabled: true
+    chat-enabled: true
+    sound: ENTITY_EXPERIENCE_ORB_PICKUP
+    volume: 1.0
+    pitch: 1.0
+
+gui:
+  main:
+    title: '&8sᴇᴄᴜʀᴇ ᴍᴀɪʟʙᴏx'
+    size: 45
+    decoration:
+      border:
+        material: BLACK_STAINED_GLASS_PANE
+        name: ' '
+        slots: [0,1,2,3,4,5,6,7,8,9,17,18,26,27,35,36,37,38,39,40,41,42,43,44]
+    items:
+      create-mail:
+        material: WRITABLE_BOOK
+        name: '&6ᴄʀᴇᴀᴛᴇ ɴᴇᴡ ᴍᴀɪʟ'
+        lore:
+          - '&7ᴄʟɪᴄᴋ ᴛᴏ ᴄᴏᴍᴘᴏsᴇ'
+        slot: 44
+      admin-mail-display:
+        material: WRITTEN_BOOK
+        name: '&6ғʀᴏᴍ: &f%sender%'
+        message-prefix: '&f'
+        lore:
+          - '&7ᴄʟɪᴄᴋ ᴛᴏ ᴠɪᴇᴡ'
+          - '&cᴇxᴘɪʀᴇs: &f%expire_date%'
+      mail-display:
+        material: MAP
+        name: '&6ғʀᴏᴍ: &f%sender%'
+        message-prefix: '&f'
+        lore:
+          - '&7ᴄʟɪᴄᴋ ᴛᴏ ᴠɪᴇᴡ'
+          - '&cᴇxᴘɪʀᴇs: &f%expire_date%'
+        slots: [10,11,12,13,14,15,16,19,20,21,22,23,24,25,28,29,30,31,32,33,34,37,38,39,40,41,42,43]
+
+  create-mail:
+    title: '&8ᴄᴏᴍᴘᴏsᴇ ᴍᴀɪʟ'
+    size: 27
+    decoration:
+      border:
+        material: BLACK_STAINED_GLASS_PANE
+        name: ' '
+        slots: [0,1,2,3,4,5,6,7,8,9,11,14,15,16, 17,18,19,20,21,22,23,24,25,26]
+    items:
+      receiver-head:
+        material: PLAYER_HEAD
+        name: '&esᴇʟᴇᴄᴛ ʀᴇᴄᴇɪᴠᴇʀ'
+        lore:
+          - '&7ᴄʟɪᴄᴋ ᴛᴏ sᴇʟᴇᴄᴛ'
+          - '&7ᴇɴᴛᴇʀ ᴘʟᴀʏᴇʀ ɴᴀᴍᴇ'
+        adminlore:
+          - '&7ᴄʟɪᴄᴋ ᴛᴏ sᴇʟᴇᴄᴛ'
+          - '&7ᴀᴅᴍɪɴs: ᴜsᴇ ";" ғᴏʀ ᴍᴜʟᴛɪᴘʟᴇ'
+          - '&7ᴄᴏᴍᴍᴀɴᴅs: "ᴀʟʟᴏɴʟɪɴᴇ", "ᴀʟʟ"'
+        slot: 10
+        current-receiver-format: '&aReceiver: &f%receiver%'
+
+      message-paper:
+        material: PAPER
+        name: '&bᴡʀɪᴛᴇ ᴍᴇssᴀɢᴇ'
+        lore:
+          - '&7ᴄʟɪᴄᴋ ᴛᴏ ᴡʀɪᴛᴇ'
+          - '&7\n ғᴏʀ ɴᴇᴡ ʟɪɴᴇs'
+        slot: 12
+        current-message-prefix: '&aCurrent message:'
+        message-line-format: '&f'
+
+      items-chest:
+        material: CHEST
+        name: '&aᴀᴅᴅ ɪᴛᴇᴍs'
+        lore:
+          - '&7ᴄʟɪᴄᴋ ᴛᴏ ᴀᴅᴅ'
+        slot: 13
+        items-count-format: '&aItems: &f%amount%'
+
+      command-block:
+        material: COMMAND_BLOCK
+        name: "&6ᴄᴏᴍᴍᴀɴᴅs"
+        lore:
+          - "&7ʟᴇғᴛ-ᴄʟɪᴄᴋ ᴛᴏ ᴀᴅᴅ"
+          - "&7ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴛᴏ ʀᴇᴍᴏᴠᴇ"
+        commands-prefix: "&bCommands:"
+        command-format: "&7⟫ /%command%"
+        slot: 15
+
+      schedule-clock:
+        material: CLOCK
+        name: "&e⏰ sᴄʜᴇᴅᴜʟᴇ & ᴇxᴘɪʀʏ"
+        lore:
+          - "&7ʟᴇғᴛ-ᴄʟɪᴄᴋ ᴛᴏ sᴄʜᴇᴅᴜʟᴇ ᴅᴇʟɪᴠᴇʀʏ"
+          - "&7ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴛᴏ sᴇᴛ ᴇxᴘɪʀʏ"
+          - ""
+          - "&esᴄʜᴇᴅᴜʟᴇᴅ ᴅᴇʟɪᴠᴇʀʏ: &f%schedule_time%"
+          - "&cᴇxᴘɪʀʏ ᴛɪᴍᴇ: &f%expire_time%"
+        slot: 16
+
+      send-button:
+        material: GREEN_TERRACOTTA
+        name: '&2sᴇɴᴅ ᴍᴀɪʟ'
+        lore:
+          - '&7ᴄʟɪᴄᴋ ᴛᴏ sᴇɴᴅ'
+        slot: 26
+  items:
+    title: '&8ᴀᴅᴅ ɪᴛᴇᴍs'
+    size: 27
+    items:
+      save-button:
+        material: GREEN_TERRACOTTA
+        name: '&asᴀᴠᴇ ɪᴛᴇᴍs'
+        lore:
+          - '&7ᴄʟɪᴄᴋ ᴛᴏ sᴀᴠᴇ'
+        slot: 26
+
+  mail-view:
+    title: "&8ᴠɪᴇᴡɪɴɢ ᴍᴀɪʟ"
+    size: 45
+    decoration:
+      border:
+        material: BLACK_STAINED_GLASS_PANE
+        name: ' '
+        slots: [0,1,2,3,4,5,6,7,8,9,17,18,26,27,35,36,37,38,39,40,41,42,43,44]
+    items:
+      sender-head:
+        material: PLAYER_HEAD
+        name: '&eғʀᴏᴍ: &f%sender%'
+        slot: 0
+
+      message:
+        material: PAPER
+        name: '&bᴍᴇssᴀɢᴇ:'
+        slot: 8
+
+      items-display:
+        slots: [10,11,12,13,14,15,16,19,20,21,22,23,24,25,28,29,30,31,32,33,34]
+
+      command-block:
+        slot: 4
+
+      claim-button:
+        material: GREEN_TERRACOTTA
+        name: "&aᴄʟᴀɪᴍ ɪᴛᴇᴍs"
+        lore:
+          - "&7ᴄʟɪᴄᴋ ᴛᴏ ᴄʟᴀɪᴍ"
+        slot: 44
+
+
+messages:
+  prefix: '&8[&6✉ SecureMailBox&8] '
+  mailbox-full: '&c✖ This mailbox is full! Maximum capacity reached.'
+  enter-receiver: '&e✎ Who would you like to send this mail to?'
+  enter-message: '&e✎ Write your message below:'
+  mail-sent: '&a✔ Mail delivered successfully!'
+  invalid-receiver: '&c✖ Player not found. Please check the name and try again.'
+  new-mail: '&a✉ You have received new mail! Check your mailbox.'
+  no-permission: '&c✖ You do not have permission for this action.'
+  inventory-space-needed: '&c⚠ You need %amount% free inventory slots to claim these items!'
+  items-claimed: '&a✔ Items claimed and added to your inventory!'
+  enter-command: '&a⌘ Enter your command below (without the /)'
+  incomplete-mail: '&c⚠ Cannot send mail - some details are missing!'
+  command-prefix: '&e⌘ Commands:'
+  command-format-display: '&7➜ /%command%'
+  current-receiver: '&a✉ Sending to: &f%receiver%'
+  current-message: '&a✎ Your message:'
+  items-added: '&a✔ Added %amount% items to mail'
+  console-only: '&c✖ This command can only be used by players!'
+  new-mail-clickable: '&a[📬 Click to View] &fNew mail from &e%sender%'
+  mail-not-found: '&c✖ This mail no longer exists.'
+  mail-no-access: '&c✖ You cannot access this mail.'
+  enter-schedule-date: "&e⏰ Enter delivery date (YYYY:MM:DD:HH:mm):"
+  enter-expire-date: "&e⌛ Enter expiry date (YYYY:MM:DD:HH:mm):"
+  invalid-date-format: "&c✖ Invalid date! Use format: YYYY:MM:DD:HH:mm"
+  schedule-set: "&a✔ Delivery scheduled for: %date%"
+  expire-set: "&a✔ Mail will expire on: %date%"
+  self-mail: '&c✖ You cannot send mail to yourself!'
+  reload-success: '&a✔ Configuration reloaded successfully!'
+  no-items-in-mail: '&7No items to claim in this mail.'
+
+
+titles:
+  notification:
+    title: "&6✉ New Mail!"
+    subtitle: "&efrom %sender%"
+    fadein: 10
+    stay: 40
+    fadeout: 10
+  input:
+    fadein: 10
+    stay: 60
+    fadeout: 10
+    receiver:
+      title: "&6✎ Select Receiver"
+      subtitle: "&eType the player name in chat"
+    message:
+      title: "&6✎ Write Message"
+      subtitle: "&eType your message in chat"
+    command:
+      title: "&6⌘ Add Command"
+      subtitle: "&eType command without /"
+    schedule:
+      title: "&6⏰ Schedule Delivery"
+      subtitle: "&eFormat: YYYY:MM:DD:HH:mm"
+    expire:
+      title: "&6⌛ Set Expiry"
+      subtitle: "&eFormat: YYYY:MM:DD:HH:mm"
+  response:
+    fadein: 10
+    stay: 40
+    fadeout: 10
+    success:
+      title: "&a✔ Success!"
+      subtitle: "&eAction completed"
+    error:
+      title: "&c✖ Error!"
+      subtitle: "&eAction failed"
+
+
