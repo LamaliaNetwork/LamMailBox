@@ -43,6 +43,8 @@ public class SecureMailBox extends JavaPlugin implements Listener {
     private Map<UUID, String> awaitingInput;
     private Map<UUID, Inventory> itemsInventories;
     private Map<UUID, Boolean> inMailCreation;
+    private Map<UUID, String> deleteConfirmations;
+    private Map<UUID, String> viewingAsPlayer;
     private FoliaLib foliaLib;
 
     @Override
@@ -55,10 +57,17 @@ public class SecureMailBox extends JavaPlugin implements Listener {
         awaitingInput = new HashMap<>();
         itemsInventories = new HashMap<>();
         inMailCreation = new HashMap<>();
+        deleteConfirmations = new HashMap<>();
+        viewingAsPlayer = new HashMap<>();
 
         getCommand("smb").setExecutor((sender, cmd, label, args) -> {
             if (args.length > 0) {
                 if (args[0].equals("send")) {
+                    // Only allow admins to use send command
+                    if (!sender.hasPermission(config.getString("settings.admin-permission"))) {
+                        sender.sendMessage(colorize(config.getString("messages.prefix") + config.getString("messages.send-command-admin-only")));
+                        return true;
+                    }
                     
                     if (args.length < 3) {
                         sender.sendMessage(colorize(config.getString("messages.prefix") + "&cUsage: /smb send <users> <message> | [commands]"));
@@ -183,6 +192,34 @@ public class SecureMailBox extends JavaPlugin implements Listener {
                         }
                         return true;
                     }
+                } else if (args[0].equals("as")) {
+                    if (!sender.hasPermission(config.getString("settings.permissions.view-as"))) {
+                        sender.sendMessage(colorize(config.getString("messages.prefix") + config.getString("messages.no-permission")));
+                        return true;
+                    }
+                    
+                    if (args.length < 2) {
+                        sender.sendMessage(colorize(config.getString("messages.prefix") + "&cUsage: /smb as <player>"));
+                        return true;
+                    }
+                    
+                    String targetPlayerName = args[1];
+                    Player targetPlayer = Bukkit.getPlayer(targetPlayerName);
+                    
+                    if (targetPlayer == null) {
+                        sender.sendMessage(colorize(config.getString("messages.prefix") + config.getString("messages.invalid-receiver")));
+                        return true;
+                    }
+                    
+                    if (sender instanceof Player) {
+                        Player adminPlayer = (Player) sender;
+                        openMailboxAsPlayer(adminPlayer, targetPlayer);
+                        adminPlayer.sendMessage(colorize(config.getString("messages.prefix") + "&aOpened mailbox as " + targetPlayer.getName()));
+                    } else {
+                        // Console can't open GUI, but can send a message
+                        sender.sendMessage(colorize(config.getString("messages.prefix") + "&cConsole cannot open GUI. Use /smb <player> instead."));
+                    }
+                    return true;
                 } else {
                     Player target = Bukkit.getPlayer(args[0]);
                     if (target == null) {
@@ -226,6 +263,81 @@ public class SecureMailBox extends JavaPlugin implements Listener {
             return true;
         });
 
+        // Register tab completer
+        getCommand("smb").setTabCompleter((sender, cmd, alias, args) -> {
+            List<String> completions = new ArrayList<>();
+            
+            if (args.length == 1) {
+                // First argument - subcommands (only show if user has permission)
+                if (sender.hasPermission(config.getString("settings.admin-permission"))) {
+                    completions.add("send");
+                }
+                if (sender.hasPermission(config.getString("settings.permissions.open"))) {
+                    completions.add("view");
+                }
+                if (sender.hasPermission(config.getString("settings.permissions.view-as"))) {
+                    completions.add("as");
+                }
+                
+                // Filter based on what the user has typed
+                return completions.stream()
+                        .filter(s -> s.toLowerCase().startsWith(args[0].toLowerCase()))
+                        .collect(Collectors.toList());
+            } else if (args.length == 2) {
+                String subCommand = args[0].toLowerCase();
+                
+                if (subCommand.equals("as")) {
+                    // Tab complete player names for "as" command
+                    if (sender.hasPermission(config.getString("settings.permissions.view-as"))) {
+                        return Bukkit.getOnlinePlayers().stream()
+                                .map(Player::getName)
+                                .filter(name -> name.toLowerCase().startsWith(args[1].toLowerCase()))
+                                .collect(Collectors.toList());
+                    }
+                } else if (subCommand.equals("send")) {
+                    // Tab complete player names for "send" command
+                    if (sender.hasPermission(config.getString("settings.admin-permission"))) {
+                        List<String> playerNames = Bukkit.getOnlinePlayers().stream()
+                                .map(Player::getName)
+                                .filter(name -> name.toLowerCase().startsWith(args[1].toLowerCase()))
+                                .collect(Collectors.toList());
+                        
+                        // Add special options for admins
+                        if (sender.hasPermission(config.getString("settings.admin-permission"))) {
+                            if ("all".startsWith(args[1].toLowerCase())) {
+                                playerNames.add("all");
+                            }
+                            if ("allonline".startsWith(args[1].toLowerCase())) {
+                                playerNames.add("allonline");
+                            }
+                        }
+                        
+                        return playerNames;
+                    }
+                } else if (subCommand.equals("view")) {
+                    // Tab complete mail IDs for "view" command (if player has sent mail)
+                    if (sender instanceof Player && sender.hasPermission(config.getString("settings.permissions.open"))) {
+                        Player player = (Player) sender;
+                        if (database.contains("mails")) {
+                            return database.getConfigurationSection("mails").getKeys(false).stream()
+                                    .filter(mailId -> mailId.toLowerCase().startsWith(args[1].toLowerCase()))
+                                    .limit(10) // Limit to 10 suggestions
+                                    .collect(Collectors.toList());
+                        }
+                    }
+                } else {
+                    // For other subcommands, suggest player names (only if they have open-others permission)
+                    if (sender.hasPermission(config.getString("settings.permissions.open-others"))) {
+                        return Bukkit.getOnlinePlayers().stream()
+                                .map(Player::getName)
+                                .filter(name -> name.toLowerCase().startsWith(args[1].toLowerCase()))
+                                .collect(Collectors.toList());
+                    }
+                }
+            }
+            
+            return completions;
+        });
 
         foliaLib.getScheduler().runTimer(() -> {
             checkScheduledMails();
@@ -341,15 +453,314 @@ public class SecureMailBox extends JavaPlugin implements Listener {
         ItemStack createBook = new ItemStack(Material.valueOf(config.getString("gui.main.items.create-mail.material")));
         ItemMeta bookMeta = createBook.getItemMeta();
         bookMeta.setDisplayName(colorize(config.getString("gui.main.items.create-mail.name")));
-        bookMeta.setLore(config.getStringList("gui.main.items.create-mail.lore").stream()
+        List<String> bookLore = new ArrayList<>(config.getStringList("gui.main.items.create-mail.lore"));
+        
+        // Add warning when viewing as another player
+        if (viewingAsPlayer.containsKey(player.getUniqueId())) {
+            bookMeta.setDisplayName(colorize("&c&l" + config.getString("gui.main.items.create-mail.name")));
+            bookLore.add(colorize("&c&l⚠ DISABLED"));
+            bookLore.add(colorize("&7Cannot create mail as another player"));
+        }
+        
+        bookMeta.setLore(bookLore.stream()
                 .map(this::colorize)
                 .collect(Collectors.toList()));
         createBook.setItemMeta(bookMeta);
         inv.setItem(config.getInt("gui.main.items.create-mail.slot"), createBook);
 
+        // Add sent mail button
+        ItemStack sentMailButton = new ItemStack(Material.valueOf(config.getString("gui.main.items.sent-mail.material")));
+        ItemMeta sentMailMeta = sentMailButton.getItemMeta();
+        sentMailMeta.setDisplayName(colorize(config.getString("gui.main.items.sent-mail.name")));
+        sentMailMeta.setLore(config.getStringList("gui.main.items.sent-mail.lore").stream()
+                .map(this::colorize)
+                .collect(Collectors.toList()));
+        sentMailButton.setItemMeta(sentMailMeta);
+        inv.setItem(config.getInt("gui.main.items.sent-mail.slot"), sentMailButton);
+
         loadPlayerMails(player, inv);
         player.openInventory(inv);
     }
+
+    private void openMailboxAsPlayer(Player admin, Player targetPlayer) {
+        if (!admin.hasPermission(config.getString("settings.permissions.view-as"))) {
+            admin.sendMessage(colorize(config.getString("messages.prefix") + config.getString("messages.no-permission")));
+            return;
+        }
+        
+        // Track that this admin is viewing as the target player
+        viewingAsPlayer.put(admin.getUniqueId(), targetPlayer.getName());
+        
+        int size = config.getInt("gui.main.size");
+        Inventory inv = Bukkit.createInventory(null, size, colorize(config.getString("gui.main.title") + " &7(as " + targetPlayer.getName() + ")"));
+        addDecorations(inv, "gui.main");
+
+        // Add create mail book
+        ItemStack createBook = new ItemStack(Material.valueOf(config.getString("gui.main.items.create-mail.material")));
+        ItemMeta bookMeta = createBook.getItemMeta();
+        bookMeta.setDisplayName(colorize(config.getString("gui.main.items.create-mail.name")));
+        List<String> bookLore = new ArrayList<>(config.getStringList("gui.main.items.create-mail.lore"));
+        
+        // Add warning when viewing as another player
+        if (viewingAsPlayer.containsKey(admin.getUniqueId())) {
+            bookMeta.setDisplayName(colorize("&c&l" + config.getString("gui.main.items.create-mail.name")));
+            bookLore.add(colorize("&c&l⚠ DISABLED"));
+            bookLore.add(colorize("&7Cannot create mail as another player"));
+        }
+        
+        bookMeta.setLore(bookLore.stream()
+                .map(this::colorize)
+                .collect(Collectors.toList()));
+        createBook.setItemMeta(bookMeta);
+        inv.setItem(config.getInt("gui.main.items.create-mail.slot"), createBook);
+
+        // Add sent mail button
+        ItemStack sentMailButton = new ItemStack(Material.valueOf(config.getString("gui.main.items.sent-mail.material")));
+        ItemMeta sentMailMeta = sentMailButton.getItemMeta();
+        sentMailMeta.setDisplayName(colorize(config.getString("gui.main.items.sent-mail.name")));
+        sentMailMeta.setLore(config.getStringList("gui.main.items.sent-mail.lore").stream()
+                .map(this::colorize)
+                .collect(Collectors.toList()));
+        sentMailButton.setItemMeta(sentMailMeta);
+        inv.setItem(config.getInt("gui.main.items.sent-mail.slot"), sentMailButton);
+
+        // Load mails for the target player
+        loadPlayerMailsAsPlayer(admin, targetPlayer, inv);
+        admin.openInventory(inv);
+    }
+
+    private void loadPlayerMailsAsPlayer(Player admin, Player targetPlayer, Inventory inv) {
+        if (!database.contains("mails")) return;
+
+        List<Integer> mailSlots = config.getIntegerList("gui.main.items.mail-display.slots");
+        int currentSlot = 0;
+
+        for (String mailId : database.getConfigurationSection("mails").getKeys(false)) {
+            String dbPath = "mails." + mailId + ".";
+            String receiver = database.getString(dbPath + "receiver");
+            List<String> claimedPlayers = database.getStringList(dbPath + "claimed-players");
+
+            boolean shouldDisplay = false;
+            boolean isActive = database.getBoolean(dbPath + "active", true);
+
+            if (isActive) {
+                if (receiver.equals("all")) {
+                    shouldDisplay = !claimedPlayers.contains(targetPlayer.getName());
+                } else if (receiver.contains(";")) {
+                    shouldDisplay = Arrays.asList(receiver.split(";")).contains(targetPlayer.getName());
+                } else {
+                    shouldDisplay = receiver.equals(targetPlayer.getName());
+                }
+            }
+
+            if (shouldDisplay) {
+                ItemStack mailItem = createMailItem(mailId);
+                if (currentSlot < mailSlots.size()) {
+                    inv.setItem(mailSlots.get(currentSlot), mailItem);
+                    currentSlot++;
+                }
+            }
+        }
+    }
+
+    private void openSentMailGUI(Player player) {
+        if (!player.hasPermission(config.getString("settings.permissions.open"))) {
+            player.sendMessage(colorize(config.getString("messages.no-permission")));
+            return;
+        }
+        int size = config.getInt("gui.sent-mail.size");
+        String title = config.getString("gui.sent-mail.title");
+        
+        // Check if admin is viewing as another player
+        String viewingAs = viewingAsPlayer.get(player.getUniqueId());
+        if (viewingAs != null) {
+            title += " &7(as " + viewingAs + ")";
+        }
+        
+        Inventory inv = Bukkit.createInventory(null, size, colorize(title));
+        addDecorations(inv, "gui.sent-mail");
+
+        // Add back button
+        ItemStack backButton = new ItemStack(Material.valueOf(config.getString("gui.sent-mail.items.back-button.material")));
+        ItemMeta backMeta = backButton.getItemMeta();
+        backMeta.setDisplayName(colorize(config.getString("gui.sent-mail.items.back-button.name")));
+        backMeta.setLore(config.getStringList("gui.sent-mail.items.back-button.lore").stream()
+                .map(this::colorize)
+                .collect(Collectors.toList()));
+        backButton.setItemMeta(backMeta);
+        inv.setItem(config.getInt("gui.sent-mail.items.back-button.slot"), backButton);
+
+        loadSentMails(player, inv);
+        player.openInventory(inv);
+    }
+
+    private void loadSentMails(Player player, Inventory inv) {
+        if (!database.contains("mails")) return;
+
+        List<Integer> mailSlots = config.getIntegerList("gui.sent-mail.items.sent-mail-display.slots");
+        int currentSlot = 0;
+
+        // Check if admin is viewing as another player
+        String viewingAs = viewingAsPlayer.get(player.getUniqueId());
+        String targetPlayerName = viewingAs != null ? viewingAs : player.getName();
+
+        for (String mailId : database.getConfigurationSection("mails").getKeys(false)) {
+            String dbPath = "mails." + mailId + ".";
+            String sender = database.getString(dbPath + "sender");
+
+            if (sender.equals(targetPlayerName)) {
+                ItemStack mailItem = createSentMailItem(mailId);
+                if (currentSlot < mailSlots.size()) {
+                    inv.setItem(mailSlots.get(currentSlot), mailItem);
+                    currentSlot++;
+                }
+            }
+        }
+
+        if (currentSlot == 0) {
+            if (viewingAs != null) {
+                player.sendMessage(colorize(config.getString("messages.prefix") + "&7" + viewingAs + " has no sent mail."));
+            } else {
+                player.sendMessage(colorize(config.getString("messages.prefix") + config.getString("messages.no-sent-mail")));
+            }
+        }
+    }
+
+    private ItemStack createSentMailItem(String mailId) {
+        ItemStack mail = new ItemStack(Material.valueOf(config.getString("gui.sent-mail.items.sent-mail-display.material")));
+        ItemMeta meta = mail.getItemMeta();
+
+        String receiver = database.getString("mails." + mailId + ".receiver");
+        String message = database.getString("mails." + mailId + ".message");
+        long sentDate = database.getLong("mails." + mailId + ".sent-date");
+        long expireDate = database.getLong("mails." + mailId + ".expire-date");
+
+        meta.setDisplayName(colorize(config.getString("gui.sent-mail.items.sent-mail-display.name").replace("%receiver%", receiver)));
+
+        List<String> lore = new ArrayList<>(config.getStringList("gui.sent-mail.items.sent-mail-display.lore"));
+        lore = lore.stream()
+                .map(line -> line.replace("%expire_date%", new Date(expireDate).toString())
+                        .replace("%sent_date%", new Date(sentDate).toString()))
+                .map(this::colorize)
+                .collect(Collectors.toList());
+
+        lore.addAll(Arrays.stream(message.replace("\\n", "\n").split("\n"))
+                .map(line -> colorize(config.getString("gui.sent-mail.items.sent-mail-display.message-prefix") + line))
+                .collect(Collectors.toList()));
+
+        meta.setLore(lore);
+        meta.getPersistentDataContainer().set(
+                new NamespacedKey(this, "mailId"),
+                PersistentDataType.STRING,
+                mailId
+        );
+
+        mail.setItemMeta(meta);
+        return mail;
+    }
+
+    private void openSentMailView(Player player, String mailId) {
+        int size = config.getInt("gui.sent-mail-view.size");
+        Inventory inv = Bukkit.createInventory(null, size, colorize(config.getString("gui.sent-mail-view.title")));
+        addDecorations(inv, "gui.sent-mail-view");
+
+        String dbPath = "mails." + mailId + ".";
+        String receiver = database.getString(dbPath + "receiver");
+        String message = database.getString(dbPath + "message").replace("\\n", "\n");
+
+        // Receiver Head
+        ItemStack head = new ItemStack(Material.valueOf(config.getString("gui.sent-mail-view.items.receiver-head.material")));
+        SkullMeta headMeta = (SkullMeta) head.getItemMeta();
+        headMeta.setDisplayName(colorize(config.getString("gui.sent-mail-view.items.receiver-head.name").replace("%receiver%", receiver)));
+        headMeta.setOwningPlayer(Bukkit.getOfflinePlayer(receiver));
+        head.setItemMeta(headMeta);
+        inv.setItem(config.getInt("gui.sent-mail-view.items.receiver-head.slot"), head);
+
+        // Message Display
+        ItemStack messageItem = new ItemStack(Material.valueOf(config.getString("gui.sent-mail-view.items.message.material")));
+        ItemMeta messageMeta = messageItem.getItemMeta();
+        messageMeta.setDisplayName(colorize(config.getString("gui.sent-mail-view.items.message.name")));
+        List<String> messageLore = Arrays.stream(message.split("\n"))
+                .map(line -> colorize("&f" + line))
+                .collect(Collectors.toList());
+        messageMeta.setLore(messageLore);
+        messageItem.setItemMeta(messageMeta);
+        inv.setItem(config.getInt("gui.sent-mail-view.items.message.slot"), messageItem);
+
+        // Items Display
+        List<String> serializedItems = database.getStringList(dbPath + "items");
+        List<ItemStack> items = serializedItems.stream()
+                .map(this::deserializeItem)
+                .collect(Collectors.toList());
+        List<Integer> itemSlots = config.getIntegerList("gui.sent-mail-view.items.items-display.slots");
+        for (int i = 0; i < Math.min(items.size(), itemSlots.size()); i++) {
+            inv.setItem(itemSlots.get(i), items.get(i));
+        }
+
+        // Add command block display if commands exist
+        List<String> commands = database.getStringList(dbPath + "commands");
+        if (!commands.isEmpty()) {
+            String serializedCommandBlock = database.getString(dbPath + "command-block");
+            ItemStack commandBlock = serializedCommandBlock != null ?
+                    deserializeItem(serializedCommandBlock) :
+                    new ItemStack(Material.COMMAND_BLOCK);
+
+            ItemMeta commandMeta = commandBlock.getItemMeta();
+            List<String> commandLore = new ArrayList<>();
+            commandMeta.setLore(commandLore);
+            commandBlock.setItemMeta(commandMeta);
+
+            inv.setItem(config.getInt("gui.sent-mail-view.items.command-block.slot"), commandBlock);
+        }
+
+        // Delete Button (only for admins with delete permission)
+        if (player.hasPermission(config.getString("settings.permissions.delete"))) {
+            ItemStack deleteButton = new ItemStack(Material.valueOf(config.getString("gui.sent-mail-view.items.delete-button.material")));
+            ItemMeta deleteMeta = deleteButton.getItemMeta();
+            deleteMeta.setDisplayName(colorize(config.getString("gui.sent-mail-view.items.delete-button.name")));
+            deleteMeta.setLore(config.getStringList("gui.sent-mail-view.items.delete-button.lore").stream()
+                    .map(this::colorize)
+                    .collect(Collectors.toList()));
+            deleteMeta.getPersistentDataContainer().set(
+                    new NamespacedKey(this, "mailId"),
+                    PersistentDataType.STRING,
+                    mailId
+            );
+            deleteButton.setItemMeta(deleteMeta);
+            inv.setItem(config.getInt("gui.sent-mail-view.items.delete-button.slot"), deleteButton);
+        }
+
+        player.openInventory(inv);
+    }
+
+    private void handleSentMailDelete(Player player, String mailId) {
+        String dbPath = "mails." + mailId + ".";
+        String sender = database.getString(dbPath + "sender");
+
+        // Check if player can delete this mail (only admins with delete permission)
+        if (!player.hasPermission(config.getString("settings.permissions.delete"))) {
+            player.sendMessage(colorize(config.getString("messages.prefix") + config.getString("messages.no-permission")));
+            return;
+        }
+
+        // Check if player is confirming deletion
+        String confirmingMailId = deleteConfirmations.get(player.getUniqueId());
+        if (confirmingMailId != null && confirmingMailId.equals(mailId)) {
+            // Delete the mail
+            database.set("mails." + mailId, null);
+            saveDatabase();
+            deleteConfirmations.remove(player.getUniqueId());
+            
+            player.closeInventory();
+            openSentMailGUI(player);
+            player.sendMessage(colorize(config.getString("messages.prefix") + config.getString("messages.mail-deleted")));
+        } else {
+            // First click - ask for confirmation
+            deleteConfirmations.put(player.getUniqueId(), mailId);
+            player.sendMessage(colorize(config.getString("messages.prefix") + config.getString("messages.delete-confirmation")));
+        }
+    }
+
     private void loadPlayerMails(Player player, Inventory inv) {
         if (!database.contains("mails")) return;
 
@@ -417,6 +828,7 @@ public class SecureMailBox extends JavaPlugin implements Listener {
         mail.setItemMeta(meta);
         return mail;
     }
+
     private void openCreateMailGUI(Player player) {
         if (!player.hasPermission(config.getString("settings.permissions.compose"))) {
             player.sendMessage(colorize(config.getString("messages.prefix") + config.getString("messages.no-permission")));
@@ -631,21 +1043,69 @@ public class SecureMailBox extends JavaPlugin implements Listener {
         Player player = (Player) event.getWhoClicked();
         String title = event.getView().getTitle();
         ItemStack clicked = event.getCurrentItem();
-        if (title.equals(colorize(config.getString("gui.main.title"))) && event.getClickedInventory() == player.getInventory()) {
+        
+        // Check if this is the main GUI (including "viewing as player" variant)
+        boolean isMainGUI = title.equals(colorize(config.getString("gui.main.title"))) || 
+                           title.startsWith(colorize(config.getString("gui.main.title") + " &7(as "));
+        
+        if (isMainGUI && event.getClickedInventory() == player.getInventory()) {
             event.setCancelled(true);
             return;
         }
         if (clicked == null || event.getClickedInventory() == event.getWhoClicked().getInventory()) return;
 
-        if (title.equals(colorize(config.getString("gui.main.title")))) {
+        if (isMainGUI) {
             event.setCancelled(true);
             if (event.getSlot() == config.getInt("gui.main.items.create-mail.slot")) {
+                // Check if admin is viewing as another player
+                String viewingAs = viewingAsPlayer.get(player.getUniqueId());
+                if (viewingAs != null) {
+                    player.sendMessage(colorize(config.getString("messages.prefix") + config.getString("messages.cannot-create-as-other")));
+                    return;
+                }
                 openCreateMailGUI(player);
+            } else if (event.getSlot() == config.getInt("gui.main.items.sent-mail.slot")) {
+                openSentMailGUI(player);
             } else if (config.getIntegerList("gui.main.items.mail-display.slots").contains(event.getSlot())) {
                 String mailId = clicked.getItemMeta().getPersistentDataContainer()
                         .get(new NamespacedKey(this, "mailId"), PersistentDataType.STRING);
                 if (mailId != null) {
                     openMailView(player, mailId);
+                }
+            }
+        } else if (title.equals(colorize(config.getString("gui.sent-mail.title"))) || 
+                   title.startsWith(colorize(config.getString("gui.sent-mail.title") + " &7(as "))) {
+            event.setCancelled(true);
+            if (event.getSlot() == config.getInt("gui.sent-mail.items.back-button.slot")) {
+                // Check if admin is viewing as another player
+                String viewingAs = viewingAsPlayer.get(player.getUniqueId());
+                if (viewingAs != null) {
+                    // Return to viewing as that player's main mailbox
+                    Player targetPlayer = Bukkit.getPlayer(viewingAs);
+                    if (targetPlayer != null) {
+                        openMailboxAsPlayer(player, targetPlayer);
+                    } else {
+                        // Target player is offline, go back to admin's own mailbox
+                        viewingAsPlayer.remove(player.getUniqueId());
+                        openMainGUI(player);
+                    }
+                } else {
+                    openMainGUI(player);
+                }
+            } else if (config.getIntegerList("gui.sent-mail.items.sent-mail-display.slots").contains(event.getSlot())) {
+                String mailId = clicked.getItemMeta().getPersistentDataContainer()
+                        .get(new NamespacedKey(this, "mailId"), PersistentDataType.STRING);
+                if (mailId != null) {
+                    openSentMailView(player, mailId);
+                }
+            }
+        } else if (title.equals(colorize(config.getString("gui.sent-mail-view.title")))) {
+            event.setCancelled(true);
+            if (event.getSlot() == config.getInt("gui.sent-mail-view.items.delete-button.slot")) {
+                String mailId = clicked.getItemMeta().getPersistentDataContainer()
+                        .get(new NamespacedKey(this, "mailId"), PersistentDataType.STRING);
+                if (mailId != null) {
+                    handleSentMailDelete(player, mailId);
                 }
             }
         } else if (title.equals(colorize(config.getString("gui.create-mail.title")))) {
@@ -909,9 +1369,9 @@ public class SecureMailBox extends JavaPlugin implements Listener {
             ItemStack displayBlock = cursor.clone();
             ItemMeta meta = displayBlock.getItemMeta();
             List<String> lore = meta.hasLore() ? meta.getLore() : new ArrayList<>();
-            lore.add(colorize("&eCommands:"));
+            lore.add(colorize(config.getString("messages.command-prefix")));
             for (String cmd : commands) {
-                lore.add(colorize("&7- /" + cmd));
+                lore.add(colorize(config.getString("messages.command-format-display").replace("%command%", cmd)));
             }
             meta.setLore(lore);
             displayBlock.setItemMeta(meta);
@@ -956,6 +1416,8 @@ public class SecureMailBox extends JavaPlugin implements Listener {
                     openCreateMailGUI(player);
                 });
             }
+            // Clear delete confirmations on any interaction
+            deleteConfirmations.remove(player.getUniqueId());
         }
     }
     @EventHandler
@@ -1000,6 +1462,16 @@ public class SecureMailBox extends JavaPlugin implements Listener {
         // Only remove the tracking if they're not in chat input mode
         if (!awaitingInput.containsKey(playerId)) {
             inMailCreation.remove(playerId);
+        }
+        
+        // Clear delete confirmations when closing any inventory
+        deleteConfirmations.remove(playerId);
+        
+        // Clear viewing as player tracking when closing main mailbox
+        boolean isMainGUI = title.equals(colorize(config.getString("gui.main.title"))) || 
+                           title.startsWith(colorize(config.getString("gui.main.title") + " &7(as "));
+        if (isMainGUI) {
+            viewingAsPlayer.remove(playerId);
         }
     }
     @EventHandler
