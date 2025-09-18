@@ -1,3 +1,5 @@
+version: 1.0
+
 settings:
   max-mails-per-player: 54
   admin-mail-expire-days: 7
@@ -21,7 +23,7 @@ settings:
 
 gui:
   main:
-    title: '&8sᴇᴄᴜʀᴇ ᴍᴀɪʟʙᴏx'
+    title: '&8ᴍᴀɪʟʙᴏx'
     size: 45
     decoration:
       border:

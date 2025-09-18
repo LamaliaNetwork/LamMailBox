@@ -32,6 +32,7 @@ import com.yusaki.lammailbox.session.MailCreationController;
 import com.yusaki.lammailbox.service.MailDelivery;
 import com.yusaki.lammailbox.service.MailService;
 import com.yusaki.lammailbox.session.MailCreationSession;
+import com.yusaki.lammailbox.config.MailBoxConfigUpdater;
 
 public class LamMailBox extends JavaPlugin implements Listener {
     private FileConfiguration config;
@@ -47,10 +48,16 @@ public class LamMailBox extends JavaPlugin implements Listener {
     private InventoryClickHandler inventoryClickHandler;
     private MailGuiFactory mailGuiFactory;
     private MailCreationController mailCreationController;
+    private MailBoxConfigUpdater configUpdater;
 
     @Override
     public void onEnable() {
         this.foliaLib = new FoliaLib(this);
+
+        // Initialize and run config updater
+        this.configUpdater = new MailBoxConfigUpdater(this);
+        configUpdater.updateConfigs();
+
         saveDefaultConfig();
         config = getConfig();
         mailRepository = new YamlMailRepository(this);
@@ -74,6 +81,9 @@ public class LamMailBox extends JavaPlugin implements Listener {
                 sender.sendMessage(colorize(config.getString("messages.no-permission")));
                 return true;
             }
+
+            // Update configs before reloading
+            configUpdater.updateConfigs();
             reloadConfig();
             config = getConfig();
             sender.sendMessage(colorize(config.getString("messages.reload-success")));
@@ -437,5 +447,9 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
     public FoliaLib getFoliaLib() {
         return foliaLib;
+    }
+
+    public MailBoxConfigUpdater getConfigUpdater() {
+        return configUpdater;
     }
 }
