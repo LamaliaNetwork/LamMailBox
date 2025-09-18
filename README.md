@@ -34,7 +34,7 @@ LamMailBox lets admins deliver items and rich-text messages to players who donâ€
 | `/lmb send <player> <message>` | `lammailbox.admin`       | Send mail via command or console |
 | `/lmbreload`                   | `lammailbox.reload`      | Reload configuration files       |
 
-Aliases: `/mailbox`, `/mail`, `/smb` (legacy)
+Aliases: `/mailbox`, `/mail`
 
 ## Setup
 
