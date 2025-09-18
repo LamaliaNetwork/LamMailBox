@@ -1,39 +1,39 @@
-name: SecureMailBox
+name: LamMailBox
 version: '${project.version}'
-main: me.zivush.securemailbox.SecureMailBox
+main: com.yusaki.lammailbox.LamMailBox
 api-version: '1.20'
 folia-supported: true
 description: A secure mailbox system for sending items, messages and commands between players
 commands:
   smb:
-    description: Main command for SecureMailBox
+    description: Main command for LamMailBox
     usage: /<command> [player|view <mailId>]
     aliases: [mailbox, mail]
   smp:
     description: Open another player's mailbox
     usage: /<command> <player>
-    permission: securemailbox.open.others
+    permission: lammailbox.open.others
   smbreload:
     description: Reload the plugin configuration
     usage: /<command>
-    permission: securemailbox.reload
+    permission: lammailbox.reload
 
 permissions:
-  securemailbox.admin:
+  lammailbox.admin:
     description: Gives access to all admin features
     default: op
-  securemailbox.open:
+  lammailbox.open:
     description: Allows opening own mailbox
     default: true
-  securemailbox.open.others:
+  lammailbox.open.others:
     description: Allows opening other players' mailboxes
     default: op
-  securemailbox.compose:
+  lammailbox.compose:
     description: Allows composing new mail
     default: true
-  securemailbox.items:
+  lammailbox.items:
     description: Allows adding items to mail
     default: true
-  securemailbox.reload:
+  lammailbox.reload:
     description: Allows reloading the plugin configuration
     default: op

@@ -1,16 +1,16 @@
 settings:
   max-mails-per-player: 54
   admin-mail-expire-days: 7
-  admin-permission: 'securemailbox.admin'
+  admin-permission: 'lammailbox.admin'
   join-notification: true
   permissions:
-    open: 'securemailbox.open'
-    open-others: 'securemailbox.open.others'
-    compose: 'securemailbox.compose'
-    add-items: 'securemailbox.items'
-    reload: 'securemailbox.reload'
-    delete: 'securemailbox.delete'
-    view-as: 'securemailbox.view.as'
+    open: 'lammailbox.open'
+    open-others: 'lammailbox.open.others'
+    compose: 'lammailbox.compose'
+    add-items: 'lammailbox.items'
+    reload: 'lammailbox.reload'
+    delete: 'lammailbox.delete'
+    view-as: 'lammailbox.view.as'
 
   notification:
     title-enabled: true
@@ -228,7 +228,7 @@ gui:
 
 
 messages:
-  prefix: '&8[&6✉ SecureMailBox&8] '
+  prefix: '&8[&6✉ LamMailBox&8] '
   mailbox-full: '&c✖ This mailbox is full! Maximum capacity reached.'
   enter-receiver: '&e✎ Who would you like to send this mail to?'
   enter-message: '&e✎ Write your message below:'
@@ -301,5 +301,4 @@ titles:
     error:
       title: "&c✖ Error!"
       subtitle: "&eAction failed"
-
 

@@ -1,1 +1,1 @@
-# SecureMailBox
+# LamMailBox
