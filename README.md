@@ -12,6 +12,9 @@ LamMailBox lets admins deliver items and rich-text messages to players who donâ€
 * **Notifications**: Chat, title, and sound alerts for new mail and join reminders.
 * **Folia/Paper ready**: Uses bundled FoliaLib scheduler for smooth cross-platform timing.
 
+![main page](https://cdn.modrinth.com/data/cached_images/27a045c3d426870f8941d9d3ca1e7b0282d3a900_0.webp)
+![mail creation page](https://cdn.modrinth.com/data/cached_images/8f6c3a33f10f14d70cdd1221b8c5c716a071d9fb_0.webp)
+
 ## Limitations & Roadmap
 
 * Single YAML database (`database.yml`) only; high-volume servers should plan their own archival or cleanup.
@@ -49,7 +52,7 @@ Aliases: `/mailbox`, `/mail`, `/smb` (legacy)
 
 ## Support
 
-* Issues: [GitHub](https://github.com/YusukiDev/SecureMailBox/issues)
+* Issues: [GitHub](https://github.com/LamaliaNetwork/LamMailBox/issues)
 * Discord: [YusakiDev](https://discord.gg/AjEh3dMPfq)
 
 Deliver mail, gifts, and rewards while players are offlineâ€”no clunky chest exchanges needed.
