@@ -271,7 +271,17 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         ItemStack clock = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.schedule-clock.material")));
         ItemMeta clockMeta = clock.getItemMeta();
         clockMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.schedule-clock.name")));
+
+        // Replace schedule and expire time placeholders
+        String scheduleTime = session.getScheduleDate() != null ?
+            new java.text.SimpleDateFormat("yyyy:MM:dd:HH:mm").format(new java.util.Date(session.getScheduleDate())) :
+            "Not set";
+        String expireTime = session.getExpireDate() != null ?
+            new java.text.SimpleDateFormat("yyyy:MM:dd:HH:mm").format(new java.util.Date(session.getExpireDate())) :
+            "Not set";
+
         clockMeta.setLore(config().getStringList("gui.create-mail.items.schedule-clock.lore").stream()
+                .map(line -> line.replace("%schedule_time%", scheduleTime).replace("%expire_time%", expireTime))
                 .map(plugin::colorize)
                 .collect(Collectors.toList()));
         clock.setItemMeta(clockMeta);
