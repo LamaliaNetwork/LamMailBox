@@ -15,10 +15,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
-public class SmbCommandExecutor implements CommandExecutor {
+public class LmbCommandExecutor implements CommandExecutor {
     private final LamMailBox plugin;
 
-    public SmbCommandExecutor(LamMailBox plugin) {
+    public LmbCommandExecutor(LamMailBox plugin) {
         this.plugin = plugin;
     }
 
@@ -51,7 +51,7 @@ public class SmbCommandExecutor implements CommandExecutor {
 
         if (args.length < 2) {
             sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                    "&cUsage: /smb send <users> <message> | [commands]"));
+                    "&cUsage: /lmb send <users> <message> | [commands]"));
             return true;
         }
 
@@ -118,7 +118,7 @@ public class SmbCommandExecutor implements CommandExecutor {
 
         if (args.length < 2) {
             sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                    "&cUsage: /smb view <mailId>"));
+                    "&cUsage: /lmb view <mailId>"));
             return true;
         }
 
@@ -167,7 +167,7 @@ public class SmbCommandExecutor implements CommandExecutor {
         }
 
         if (args.length < 2) {
-            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") + "&cUsage: /smb as <player>"));
+            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") + "&cUsage: /lmb as <player>"));
             return true;
         }
 
@@ -185,7 +185,7 @@ public class SmbCommandExecutor implements CommandExecutor {
                     "&aOpened mailbox as " + targetPlayer.getName()));
         } else {
             sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                    "&cConsole cannot open GUI. Use /smb <player> instead."));
+                    "&cConsole cannot open GUI. Use /lmb <player> instead."));
         }
         return true;
     }
@@ -218,7 +218,7 @@ public class SmbCommandExecutor implements CommandExecutor {
     private boolean handleDefault(CommandSender sender) {
         FileConfiguration config = plugin.getConfig();
         if (!(sender instanceof Player)) {
-            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") + "&cUsage: /smb <player>"));
+            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") + "&cUsage: /lmb <player>"));
             return true;
         }
 

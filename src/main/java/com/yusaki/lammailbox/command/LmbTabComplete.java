@@ -13,10 +13,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-public class SmbTabCompleter implements TabCompleter {
+public class LmbTabComplete implements TabCompleter {
     private final LamMailBox plugin;
 
-    public SmbTabCompleter(LamMailBox plugin) {
+    public LmbTabComplete(LamMailBox plugin) {
         this.plugin = plugin;
     }
 

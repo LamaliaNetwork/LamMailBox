@@ -20,8 +20,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.*;
 
-import com.yusaki.lammailbox.command.SmbCommandExecutor;
-import com.yusaki.lammailbox.command.SmbTabCompleter;
+import com.yusaki.lammailbox.command.LmbCommandExecutor;
+import com.yusaki.lammailbox.command.LmbTabComplete;
 import com.yusaki.lammailbox.gui.ConfigMailGuiFactory;
 import com.yusaki.lammailbox.gui.InventoryClickHandler;
 import com.yusaki.lammailbox.gui.MailGuiFactory;
@@ -72,11 +72,11 @@ public class LamMailBox extends JavaPlugin implements Listener {
         mailGuiFactory = new ConfigMailGuiFactory(this);
         mailCreationController = new MailCreationController(this);
 
-        SmbCommandExecutor smbExecutor = new SmbCommandExecutor(this);
-        getCommand("smb").setExecutor(smbExecutor);
-        getCommand("smb").setTabCompleter(new SmbTabCompleter(this));
+        LmbCommandExecutor lmbCommandExecutor = new LmbCommandExecutor(this);
+        getCommand("lmb").setExecutor(lmbCommandExecutor);
+        getCommand("lmb").setTabCompleter(new LmbTabComplete(this));
 
-        getCommand("smbreload").setExecutor((sender, cmd, label, args) -> {
+        getCommand("lmbreload").setExecutor((sender, cmd, label, args) -> {
             if (!sender.hasPermission(config.getString("settings.permissions.reload"))) {
                 sender.sendMessage(colorize(config.getString("messages.no-permission")));
                 return true;
@@ -357,7 +357,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
                     .replace("%sender%", sender);
 
             TextComponent message = new TextComponent(colorize(config.getString("messages.prefix") + chatMessage));
-            message.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/smb view " + mailId));
+            message.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/lmb view " + mailId));
             receiver.spigot().sendMessage(message);
         }
 

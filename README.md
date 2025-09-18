@@ -1,166 +1,55 @@
-# 📬 LamMailBox
+LamMailBox lets admins deliver items and rich-text messages to players who don’t need to be online. It’s a lightweight mailbox system for Paper/Folia 1.20+ that works from commands or plugin triggers.
 
-[![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)](https://github.com/YusukiDev/SecureMailBox)
-[![Java](https://img.shields.io/badge/java-21-orange.svg)](https://openjdk.java.net/projects/jdk/21/)
-[![Spigot](https://img.shields.io/badge/spigot-1.20+-green.svg)](https://www.spigotmc.org/)
-[![Folia](https://img.shields.io/badge/folia-supported-brightgreen.svg)](https://papermc.io/software/folia)
+## Key Features
 
-A secure mailbox system for Minecraft servers that allows players to send items, messages, and commands between each other. Built with modern Bukkit/Spigot API and Folia support.
+* **Offline delivery**: Send mail and item attachments to any player, anytime. Items stay server-side until claimed.
+* **Command-friendly**: Use `/lmb send` directly or call it from other plugins to automate rewards, gifts, or event drops.
+* **Simple GUI**: Players browse, read, and claim mail through an intuitive interface with inventory checks on pickup.
+* **Rich messages**: Supports colour codes and `\n` line breaks.
+* **Admin tools**: Optional console commands execute when mail is claimed. Schedule or expire mail using `YYYY:MM:DD:HH:mm`.
+* **Bulk targets**: `player1;player2`, `allonline` (current online players), or `all` (remains until everyone claims).
+* **Reliable storage**: YAML-backed with hourly cleanup of expired entries and automatic config migrations via YskLib.
+* **Notifications**: Chat, title, and sound alerts for new mail and join reminders.
+* **Folia/Paper ready**: Uses bundled FoliaLib scheduler for smooth cross-platform timing.
 
-## ✨ Features
+## Limitations & Roadmap
 
-- **Item Transfer**: Send items safely between players through GUI-based mailboxes
-- **Rich Messaging**: Support for formatted messages with color codes and newlines
-- **Command Attachments**: Attach commands that execute when mail is claimed (admin feature)
-- **Scheduled Delivery**: Schedule mail for delivery at specific times
-- **Mail Expiration**: Automatic cleanup of expired mail
-- **Admin Tools**: View and manage other players' mailboxes
-- **Notifications**: Chat, title, and sound notifications for new mail
-- **Folia Compatible**: Full support for Paper's multi-threaded Folia server software
-- **Config Management**: Automatic configuration updates with YskLib integration
+* Single YAML database (`database.yml`) only; high-volume servers should plan their own archival or cleanup.
+* No cross-server syncing or Bungee/Velocity support yet.
+* `allonline` sends only to players online at send time.
+* Mail files are plain text; staff can read or edit them.
+* Command attachments always run as console commands—review for security.
 
-## 📋 Requirements
+## Commands
 
-- **Minecraft Server**: Spigot/Paper 1.20+
-- **Java Version**: Java 21 or higher
-- **Dependencies**:
-  - FoliaLib (automatically shaded)
-  - YskLib (for config management)
+| Command                        | Permission               | Description                      |
+| ------------------------------ | ------------------------ | -------------------------------- |
+| `/lmb`                         | `lammailbox.open`        | Open your mailbox                |
+| `/lmb <player>`                | `lammailbox.open.others` | View another player's mailbox    |
+| `/lmb view <id>`               | `lammailbox.open`        | View mail by ID                  |
+| `/lmb as <player>`             | `lammailbox.view.as`     | View mail UI as another player   |
+| `/lmb send <player> <message>` | `lammailbox.admin`       | Send mail via command or console |
+| `/lmbreload`                   | `lammailbox.reload`      | Reload configuration files       |
 
-## 🚀 Installation
+Aliases: `/mailbox`, `/mail`, `/smb` (legacy)
 
-1. Download the latest release
-2. Place the JAR file in your server's `plugins` folder
-3. Restart your server
-4. Configure the plugin by editing `plugins/LamMailBox/config.yml`
+## Setup
 
-## 🎛️ Commands
+1. Drop the jar in `plugins/` and start the server to generate config/database files.
+2. Edit `plugins/LamMailBox/config.yml` to customize GUI text, slots, and notification settings.
+3. Grant the permissions that fit your ranks.
+4. Compose mail through the GUI or use `/lmb send` (or another plugin trigger) for automated deliveries.
 
-| Command | Permission | Description |
-|---------|-----------|-------------|
-| `/smb` | `lammailbox.open` | Open your mailbox |
-| `/smb <player>` | `lammailbox.open.others` | Open another player's mailbox |
-| `/smb view <mailId>` | `lammailbox.open` | View specific mail by ID |
-| `/smb as <player>` | `lammailbox.view.as` | View mailbox as another player |
-| `/smb send <player> <message>` | `lammailbox.admin` | Send mail via command (admin only) |
-| `/smbreload` | `lammailbox.reload` | Reload plugin configuration |
+## Requirements
 
-**Aliases**: `mailbox`, `mail`
+* Paper or Spigot 1.20+
+* Java 21 runtime
+* Bundled FoliaLib for scheduling
+* [YskLib](https://github.com/YusakiDev/YskLib/releases) 1.6.0 or above
 
-## 🔑 Permissions
+## Support
 
-| Permission | Default | Description |
-|------------|---------|-------------|
-| `lammailbox.admin` | `op` | Access to all admin features |
-| `lammailbox.open` | `true` | Open own mailbox |
-| `lammailbox.open.others` | `op` | Open other players' mailboxes |
-| `lammailbox.compose` | `true` | Compose and send new mail |
-| `lammailbox.items` | `true` | Add items to mail |
-| `lammailbox.reload` | `op` | Reload plugin configuration |
-| `lammailbox.delete` | `op` | Delete sent mail |
-| `lammailbox.view.as` | `op` | View mailbox as another player |
+* Issues: [GitHub](https://github.com/YusukiDev/SecureMailBox/issues)
+* Discord: [YusakiDev](https://discord.gg/AjEh3dMPfq)
 
-## ⚙️ Configuration
-
-The plugin uses a YAML configuration system with automatic updates:
-
-### Basic Settings
-```yaml
-version: 1.0
-settings:
-  max-mails-per-player: 54
-  admin-mail-expire-days: 7
-  join-notification: true
-  admin-permission: 'lammailbox.admin'
-```
-
-### GUI Configuration
-The GUI is fully customizable through the config file, including:
-- Custom item materials, names, and lore
-- Configurable inventory sizes and layouts
-- Decoration and border items
-- Message formatting and colors
-
-### Notification Settings
-```yaml
-settings:
-  notification:
-    title-enabled: true
-    chat-enabled: true
-    sound: ENTITY_EXPERIENCE_ORB_PICKUP
-    volume: 1.0
-    pitch: 1.0
-```
-
-## 📖 Usage
-
-### Basic Mail System
-1. Use `/smb` to open your mailbox
-2. Click "Create New Mail" to compose a message
-3. Select recipient, write message, and optionally add items
-4. Send the mail - recipient will be notified when they join
-
-### Admin Features
-- Use `/smb as <player>` to view any player's mailbox for support
-- Send mail via commands using `/smb send <player> <message>`
-- Delete sent mail through the GUI interface
-- Schedule mail delivery and set expiration dates
-
-### Date Format
-For scheduling and expiry dates, use: `YYYY:MM:DD:HH:mm`
-Example: `2024:12:25:09:30`
-
-## 🔧 Technical Details
-
-### Architecture
-```
-src/main/java/com/yusaki/lammailbox/
-├── command/          # Command handlers and tab completion
-├── config/           # Configuration management with YskLib
-├── gui/              # GUI factories and inventory handlers
-├── repository/       # Data storage (YAML-based)
-├── service/          # Mail business logic and operations
-├── session/          # Mail creation session management
-└── util/             # Utility classes
-```
-
-### Storage
-- Uses YAML files for data persistence
-- Automatic mail cleanup for expired items
-- Backup creation during config updates
-- Configuration migration support
-
-### Performance
-- Efficient scheduled task system for mail delivery
-- Folia-compatible threading for multi-threaded servers
-- Optimized inventory operations
-
-## 🔧 Building
-
-```bash
-git clone <repository-url>
-cd SecureMailBox
-mvn clean package
-```
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## 📄 License
-
-This project is licensed under the MIT License.
-
-## 🙏 Acknowledgments
-
-- **YskLib** for configuration management and updates
-- **FoliaLib** for Folia server compatibility
-- **Spigot/Paper** community for continuous support
-
----
-
-*Developed by Yusaki*
+Deliver mail, gifts, and rewards while players are offline—no clunky chest exchanges needed.
