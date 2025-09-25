@@ -9,7 +9,9 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -24,6 +26,7 @@ public class LmbTabComplete implements TabCompleter {
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         FileConfiguration config = plugin.getConfig();
         if (args.length == 1) {
+            String current = args[0].toLowerCase();
             List<String> completions = new ArrayList<>();
             if (sender.hasPermission(config.getString("settings.admin-permission"))) {
                 completions.add("send");
@@ -34,7 +37,6 @@ public class LmbTabComplete implements TabCompleter {
             if (sender.hasPermission(config.getString("settings.permissions.view-as"))) {
                 completions.add("as");
             }
-            String current = args[0].toLowerCase();
             return completions.stream()
                     .filter(entry -> entry.toLowerCase().startsWith(current))
                     .collect(Collectors.toList());
@@ -67,13 +69,10 @@ public class LmbTabComplete implements TabCompleter {
                 }
             } else if (Objects.equals(subCommand, "view")) {
                 if (sender instanceof Player && sender.hasPermission(config.getString("settings.permissions.open"))) {
-                    FileConfiguration database = plugin.getMailRepository().getBackingConfiguration();
-                    if (database.contains("mails")) {
-                        return database.getConfigurationSection("mails").getKeys(false).stream()
-                                .filter(mailId -> mailId.toLowerCase().startsWith(current))
-                                .limit(10)
-                                .collect(Collectors.toList());
-                    }
+                    return plugin.getMailRepository().listMailIds().stream()
+                            .filter(mailId -> mailId.toLowerCase().startsWith(current))
+                            .limit(10)
+                            .collect(Collectors.toList());
                 }
             } else {
                 if (sender.hasPermission(config.getString("settings.permissions.open-others"))) {

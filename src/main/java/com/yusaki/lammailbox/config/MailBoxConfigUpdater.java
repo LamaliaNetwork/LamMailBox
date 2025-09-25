@@ -1,6 +1,7 @@
 package com.yusaki.lammailbox.config;
 
 import com.yusaki.lammailbox.LamMailBox;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.yusaki.lib.config.ConfigMigration;
 import org.yusaki.lib.config.ConfigUpdateOptions;
@@ -8,9 +9,6 @@ import org.yusaki.lib.config.ConfigUpdateService;
 
 import java.io.File;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-
 /**
  * Handles configuration updates for LamMailBox using YskLib's ConfigUpdateService.
  */
@@ -26,7 +24,7 @@ public class MailBoxConfigUpdater {
      */
     public void updateConfigs() {
         updateMainConfig();
-        updateDatabaseConfig();
+        updateStorageConfig();
     }
 
     /**
@@ -49,15 +47,15 @@ public class MailBoxConfigUpdater {
     }
 
     /**
-     * Updates the database.yml file.
+     * Updates the storage.yml file that controls the persistence backend.
      */
-    private void updateDatabaseConfig() {
+    private void updateStorageConfig() {
         ConfigUpdateOptions options = ConfigUpdateOptions.builder()
-                .fileName("database.yml")
-                .resourcePath("database.yml")
+                .fileName("storage.yml")
+                .resourcePath("storage.yml")
                 .backupEnabled(true)
                 .preserveExistingValues(true)
-                .reorderToTemplate(false)
+                .reorderToTemplate(true)
                 .skipMergeIfVersionMatches(false)
                 .build();
 
@@ -87,6 +85,22 @@ public class MailBoxConfigUpdater {
 
         // Add version if it doesn't exist or update it
         config.set("version", CURRENT_CONFIG_VERSION);
+
+        if (!config.contains("settings.default-expire-days")) {
+            int legacy = config.getInt("settings.admin-mail-expire-days", 7);
+            config.set("settings.default-expire-days", legacy);
+        }
+        if (config.contains("settings.admin-mail-expire-days")) {
+            config.set("settings.admin-mail-expire-days", null);
+        }
+
+        ConfigurationSection aliasSection = config.getConfigurationSection("settings.command-aliases");
+        if (aliasSection == null) {
+            aliasSection = config.createSection("settings.command-aliases");
+        }
+        if (!aliasSection.contains("base")) {
+            aliasSection.set("base", Arrays.asList("mailbox", "mail", "mb"));
+        }
 
         // Add any config-specific migrations here
         // Example: if (config.getDouble("version", 0.0) < 1.1) { ... }

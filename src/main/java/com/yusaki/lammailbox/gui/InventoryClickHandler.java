@@ -1,6 +1,7 @@
 package com.yusaki.lammailbox.gui;
 
 import com.yusaki.lammailbox.LamMailBox;
+import com.yusaki.lammailbox.repository.MailRecord;
 import com.yusaki.lammailbox.session.MailCreationSession;
 import com.yusaki.lammailbox.util.ItemSerialization;
 import org.bukkit.Bukkit;
@@ -386,15 +387,9 @@ public class InventoryClickHandler implements MailInventoryHandler {
     }
 
     private void handleMailClaim(Player player, String mailId) {
-        String dbPath = "mails." + mailId + ".";
-
-        List<String> serializedItems = database().getStringList(dbPath + "items");
-        List<ItemStack> items = serializedItems.stream()
-                .map(ItemSerialization::deserializeItem)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-
-        List<String> commands = database().getStringList(dbPath + "commands");
+        List<ItemStack> items = plugin.getMailRepository().loadMailItems(mailId);
+        Optional<MailRecord> mailRecord = plugin.getMailRepository().findRecord(mailId);
+        List<String> commands = mailRecord.map(MailRecord::commands).orElse(Collections.emptyList());
         boolean hasRewards = !items.isEmpty() || !commands.isEmpty();
 
         if (!items.isEmpty()) {
@@ -470,9 +465,5 @@ public class InventoryClickHandler implements MailInventoryHandler {
 
     private FileConfiguration config() {
         return plugin.getConfig();
-    }
-
-    private FileConfiguration database() {
-        return plugin.getMailRepository().getBackingConfiguration();
     }
 }

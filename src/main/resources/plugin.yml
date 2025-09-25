@@ -10,15 +10,14 @@ commands:
   lmb:
     description: Main command for LamMailBox
     usage: /<command> [player|view <mailId>]
-    aliases: [mailbox, mail, mb]
-  lmp:
-    description: Open another player's mailbox
-    usage: /<command> <player>
-    permission: lammailbox.open.others
   lmbreload:
     description: Reload the plugin configuration
     usage: /<command>
     permission: lammailbox.reload
+  lmbmigrate:
+    description: Migrate LamMailBox data between storage backends
+    usage: /<command> <source> <target>
+    permission: lammailbox.migrate
 
 permissions:
   lammailbox.admin:
@@ -38,4 +37,7 @@ permissions:
     default: op
   lammailbox.reload:
     description: Allows reloading the plugin configuration
+    default: op
+  lammailbox.migrate:
+    description: Allows migrating LamMailBox storage between backends
     default: op

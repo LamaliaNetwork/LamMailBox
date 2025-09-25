@@ -57,7 +57,7 @@ public class MailCreationController {
             return true;
         }
 
-        int currentMails = database().getInt("player-mail-counts." + input, 0);
+        int currentMails = plugin.getMailRepository().countActiveMailFor(input);
         if (currentMails >= config().getInt("settings.max-mails-per-player")) {
             sender.sendMessage(plugin.colorize(config().getString("messages.prefix") +
                     config().getString("messages.mailbox-full")));
@@ -113,11 +113,6 @@ public class MailCreationController {
     private boolean isBulkTarget(String input) {
         return input.equalsIgnoreCase("all") || input.equalsIgnoreCase("allonline") || input.contains(";");
     }
-
-    private FileConfiguration config() {
-        return plugin.getConfig();
-    }
-
     public void reopenCreationAsync(Player player) {
         if (player == null) {
             return;
@@ -125,7 +120,7 @@ public class MailCreationController {
         plugin.getFoliaLib().getScheduler().runNextTick(task -> plugin.openCreateMailGUI(player));
     }
 
-    private FileConfiguration database() {
-        return plugin.getMailRepository().getBackingConfiguration();
+    private FileConfiguration config() {
+        return plugin.getConfig();
     }
 }

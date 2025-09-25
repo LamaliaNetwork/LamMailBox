@@ -150,7 +150,7 @@ public class DefaultMailService implements MailService {
         Long scheduleDate = session.getScheduleDate();
         Long expireDate = session.getExpireDate();
         if (expireDate == null) {
-            int expireAfterDays = config().getInt("settings.admin-mail-expire-days");
+            int expireAfterDays = getDefaultExpireDays();
             expireDate = now + expireAfterDays * 86400000L;
         }
 
@@ -213,5 +213,14 @@ public class DefaultMailService implements MailService {
 
     private org.bukkit.configuration.file.FileConfiguration config() {
         return plugin.getConfig();
+    }
+
+    private int getDefaultExpireDays() {
+        int configured = config().getInt("settings.default-expire-days", -1);
+        if (configured > 0) {
+            return configured;
+        }
+        // Backwards compatibility with older configs
+        return Math.max(1, config().getInt("settings.admin-mail-expire-days", 7));
     }
 }

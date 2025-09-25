@@ -1,0 +1,3 @@
+storage:
+  # Available options: yaml, sqlite
+  type: sqlite

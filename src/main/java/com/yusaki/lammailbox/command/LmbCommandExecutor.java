@@ -1,6 +1,7 @@
 package com.yusaki.lammailbox.command;
 
 import com.yusaki.lammailbox.LamMailBox;
+import com.yusaki.lammailbox.repository.MailRecord;
 import com.yusaki.lammailbox.service.MailDelivery;
 import com.yusaki.lammailbox.session.MailCreationSession;
 import org.bukkit.Bukkit;
@@ -10,10 +11,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 public class LmbCommandExecutor implements CommandExecutor {
     private final LamMailBox plugin;
@@ -28,8 +26,8 @@ public class LmbCommandExecutor implements CommandExecutor {
             return handleDefault(sender);
         }
 
-        String subCommand = args[0].toLowerCase();
-        switch (subCommand) {
+        String rawSubCommand = args[0];
+        switch (rawSubCommand.toLowerCase(Locale.ROOT)) {
             case "send":
                 return handleSend(sender, Arrays.copyOfRange(args, 1, args.length));
             case "view":
@@ -37,7 +35,7 @@ public class LmbCommandExecutor implements CommandExecutor {
             case "as":
                 return handleAs(sender, args);
             default:
-                return handleOpenOther(sender, args[0]);
+                return handleOpenOther(sender, rawSubCommand);
         }
     }
 
@@ -175,30 +173,16 @@ public class LmbCommandExecutor implements CommandExecutor {
 
         Player player = (Player) sender;
         String mailId = args[1];
-        String dbPath = "mails." + mailId + ".";
-        FileConfiguration database = plugin.getMailRepository().getBackingConfiguration();
 
-        if (!database.contains(dbPath)) {
+        Optional<MailRecord> recordOpt = plugin.getMailRepository().findRecord(mailId);
+        if (recordOpt.isEmpty()) {
             player.sendMessage(plugin.colorize(config.getString("messages.prefix") +
                     config.getString("messages.mail-not-found")));
             return true;
         }
 
-        String receiver = database.getString(dbPath + "receiver");
-        List<String> claimedPlayers = database.getStringList(dbPath + "claimed-players");
-
-        boolean canAccess = false;
-        boolean isActive = database.getBoolean(dbPath + "active", true);
-        if (isActive) {
-            if (Objects.equals(receiver, "all")) {
-                canAccess = !claimedPlayers.contains(player.getName());
-            } else if (receiver != null && receiver.contains(";")) {
-                canAccess = Arrays.asList(receiver.split(";"))
-                        .contains(player.getName());
-            } else {
-                canAccess = Objects.equals(receiver, player.getName());
-            }
-        }
+        MailRecord record = recordOpt.get();
+        boolean canAccess = record.canBeClaimedBy(player.getName());
 
         if (canAccess) {
             plugin.openMailView(player, mailId);

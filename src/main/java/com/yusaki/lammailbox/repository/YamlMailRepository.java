@@ -130,8 +130,13 @@ public class YamlMailRepository implements MailRepository {
     }
 
     @Override
-    public FileConfiguration getBackingConfiguration() {
-        return database;
+    public Optional<MailRecord> findRecord(String mailId) {
+        return findMail(mailId).flatMap(data -> MailRecord.from(mailId, data));
+    }
+
+    @Override
+    public int countActiveMailFor(String playerName) {
+        return listActiveMailIdsFor(playerName).size();
     }
 
     private ConfigurationSection getMailSection(String mailId, boolean create) {
@@ -143,5 +148,10 @@ public class YamlMailRepository implements MailRepository {
             return database.createSection(path);
         }
         return null;
+    }
+
+    @Override
+    public void shutdown() {
+        save();
     }
 }

@@ -6,7 +6,7 @@
 
     <groupId>com.yusaki</groupId>
     <artifactId>LamMailBox</artifactId>
-    <version>1.3.0</version>
+    <version>1.4.0</version>
     <packaging>jar</packaging>
 
     <name>LamMailBox</name>
@@ -111,6 +111,11 @@
             <artifactId>lib</artifactId>
             <version>1.6.0</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.45.3.0</version>
         </dependency>
     </dependencies>
 </project>

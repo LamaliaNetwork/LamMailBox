@@ -1,6 +1,5 @@
 package com.yusaki.lammailbox.repository;
 
-import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.List;
@@ -8,8 +7,8 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Repository abstraction over the YAML mail database. This will let us detach
- * high-level workflows from low-level persistence concerns.
+ * Repository abstraction over the mail persistence layer. Implementations
+ * are free to back this with flat files, SQL stores, or any other medium.
  */
 public interface MailRepository {
     Map<String, Object> loadMail(String mailId);
@@ -32,6 +31,11 @@ public interface MailRepository {
 
     List<ItemStack> loadMailItems(String mailId);
 
-    FileConfiguration getBackingConfiguration();
+    Optional<MailRecord> findRecord(String mailId);
 
+    int countActiveMailFor(String playerName);
+
+    default void shutdown() {
+        // optional hook for implementations that need explicit cleanup
+    }
 }

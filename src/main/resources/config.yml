@@ -1,8 +1,8 @@
-version: 1.0
+version: 1.1
 
 settings:
   max-mails-per-player: 54
-  admin-mail-expire-days: 7
+  default-expire-days: 7
   admin-permission: 'lammailbox.admin'
   join-notification: true
   permissions:
@@ -13,6 +13,7 @@ settings:
     reload: 'lammailbox.reload'
     delete: 'lammailbox.delete'
     view-as: 'lammailbox.view.as'
+    migrate: 'lammailbox.migrate'
 
   notification:
     title-enabled: true
@@ -20,6 +21,9 @@ settings:
     sound: ENTITY_EXPERIENCE_ORB_PICKUP
     volume: 1.0
     pitch: 1.0
+
+  command-aliases:
+    base: [mailbox, mail, mb]
 
 gui:
   main:
@@ -284,6 +288,7 @@ gui:
         enabled: true
         material: GREEN_TERRACOTTA
         name: "&aᴍᴀʀᴋ ᴀs ʀᴇᴀᴅ"
+        slot: 44
         lore:
           - "&7ᴄʟɪᴄᴋ ᴛᴏ ᴅɪsᴍɪss"
 
@@ -324,6 +329,13 @@ messages:
   viewing-as-player: '&7Viewing mailbox as %player%'
   send-command-admin-only: '&cOnly admins can use the send command. Use the GUI to send mail.'
   cannot-create-as-other: '&cYou cannot create mail as another player. Use your own mailbox to send mail.'
+  migrate-usage: '&cUsage: /lmbmigrate <source> <target>'
+  migrate-invalid: '&c✖ Unknown storage type: %type%'
+  migrate-same: '&c✖ Source and target storage must be different.'
+  migrate-start: '&eMigrating mail from &f%source% &eto &f%target%&e...'
+  migrate-empty: '&eNo mail entries found in %source% storage.'
+  migrate-success: '&a✔ Migration complete: %count% mails moved to %target%.'
+  migrate-error: '&c✖ Migration failed: %error%'
 
 
 titles:

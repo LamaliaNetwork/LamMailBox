@@ -5,6 +5,9 @@ import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
+import org.bukkit.command.CommandMap;
+import org.bukkit.command.PluginCommand;
+import org.bukkit.command.SimpleCommandMap;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -21,11 +24,14 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.*;
 
 import com.yusaki.lammailbox.command.LmbCommandExecutor;
+import com.yusaki.lammailbox.command.LmbMigrateCommand;
 import com.yusaki.lammailbox.command.LmbTabComplete;
+import com.yusaki.lammailbox.config.StorageSettings;
 import com.yusaki.lammailbox.gui.ConfigMailGuiFactory;
 import com.yusaki.lammailbox.gui.InventoryClickHandler;
 import com.yusaki.lammailbox.gui.MailGuiFactory;
 import com.yusaki.lammailbox.repository.MailRepository;
+import com.yusaki.lammailbox.repository.SqliteMailRepository;
 import com.yusaki.lammailbox.repository.YamlMailRepository;
 import com.yusaki.lammailbox.service.DefaultMailService;
 import com.yusaki.lammailbox.session.MailCreationController;
@@ -38,7 +44,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
     private FileConfiguration config;
     private MailRepository mailRepository;
     private MailService mailService;
-    private FileConfiguration database;
+    private StorageSettings.BackendType activeBackend;
     private Map<UUID, MailCreationSession> mailSessions;
     private Map<UUID, String> awaitingInput;
     private Map<UUID, Boolean> inMailCreation;
@@ -60,8 +66,8 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
         saveDefaultConfig();
         config = getConfig();
-        mailRepository = new YamlMailRepository(this);
-        database = mailRepository.getBackingConfiguration();
+        StorageSettings storageSettings = StorageSettings.load(this);
+        mailRepository = createRepository(storageSettings);
         mailService = new DefaultMailService(this, mailRepository, foliaLib);
         mailSessions = new HashMap<>();
         awaitingInput = new HashMap<>();
@@ -71,10 +77,13 @@ public class LamMailBox extends JavaPlugin implements Listener {
         inventoryClickHandler = new InventoryClickHandler(this);
         mailGuiFactory = new ConfigMailGuiFactory(this);
         mailCreationController = new MailCreationController(this);
+        applyCommandAliases();
 
         LmbCommandExecutor lmbCommandExecutor = new LmbCommandExecutor(this);
         getCommand("lmb").setExecutor(lmbCommandExecutor);
         getCommand("lmb").setTabCompleter(new LmbTabComplete(this));
+
+        getCommand("lmbmigrate").setExecutor(new LmbMigrateCommand(this));
 
         getCommand("lmbreload").setExecutor((sender, cmd, label, args) -> {
             if (!sender.hasPermission(config.getString("settings.permissions.reload"))) {
@@ -86,6 +95,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
             configUpdater.updateConfigs();
             reloadConfig();
             config = getConfig();
+            applyCommandAliases();
             sender.sendMessage(colorize(config.getString("messages.reload-success")));
             return true;
         });
@@ -96,6 +106,13 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
         Bukkit.getPluginManager().registerEvents(this, this);
         startCleanupTask();
+    }
+
+    @Override
+    public void onDisable() {
+        if (mailRepository != null) {
+            mailRepository.shutdown();
+        }
     }
 
 
@@ -183,28 +200,14 @@ public class LamMailBox extends JavaPlugin implements Listener {
     }
 
     private void checkPlayerMails(Player player) {
-        if (!database.contains("mails")) return;
-
-        ConfigurationSection mailsSection = database.getConfigurationSection("mails");
-        for (String mailId : mailsSection.getKeys(false)) {
-            String receiver = database.getString("mails." + mailId + ".receiver");
-            boolean isActive = database.getBoolean("mails." + mailId + ".active", true);
-            List<String> claimedPlayers = database.getStringList("mails." + mailId + ".claimed-players");
-
-            if (isActive && shouldNotifyPlayer(player, receiver, claimedPlayers)) {
-                String sender = database.getString("mails." + mailId + ".sender");
-                sendMailNotification(player, mailId, sender);
-            }
-        }
-    }
-
-    private boolean shouldNotifyPlayer(Player player, String receiver, List<String> claimedPlayers) {
-        if (receiver.equals("all")) {
-            return !claimedPlayers.contains(player.getName());
-        } else if (receiver.contains(";")) {
-            return Arrays.asList(receiver.split(";")).contains(player.getName());
-        } else {
-            return receiver.equals(player.getName());
+        String playerName = player.getName();
+        for (String mailId : mailRepository.listActiveMailIdsFor(playerName)) {
+            mailRepository.findRecord(mailId).ifPresent(record -> {
+                if (record.canBeClaimedBy(playerName)) {
+                    String sender = Optional.ofNullable(record.sender()).orElse("Console");
+                    sendMailNotification(player, mailId, sender);
+                }
+            });
         }
     }
 
@@ -451,5 +454,86 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
     public MailBoxConfigUpdater getConfigUpdater() {
         return configUpdater;
+    }
+
+    public StorageSettings.BackendType getActiveBackend() {
+        return activeBackend;
+    }
+
+    public MailRepository buildRepository(StorageSettings settings,
+                                          StorageSettings.BackendType backendType,
+                                          boolean allowImport) {
+        if (backendType == StorageSettings.BackendType.SQLITE) {
+            StorageSettings.SqliteSettings sqliteSettings = allowImport
+                    ? settings.sqlite()
+                    : settings.sqlite().withImport(false);
+            if (!sqliteSettings.isEnabled()) {
+                throw new IllegalStateException("SQLite storage is not configured. Set storage.sqlite.file in storage.yml");
+            }
+            return new SqliteMailRepository(this, sqliteSettings);
+        }
+        return new YamlMailRepository(this);
+    }
+
+    private MailRepository createRepository(StorageSettings settings) {
+        MailRepository repository = buildRepository(settings, settings.backendType(), true);
+        if (settings.backendType() == StorageSettings.BackendType.SQLITE) {
+            getLogger().info("Loaded LamMailBox using SQLite storage");
+        } else {
+            getLogger().info("Loaded LamMailBox using YAML storage");
+        }
+        activeBackend = settings.backendType();
+        return repository;
+    }
+
+    private void applyCommandAliases() {
+        PluginCommand command = getCommand("lmb");
+        if (command == null) {
+            return;
+        }
+
+        FileConfiguration config = getConfig();
+        ConfigurationSection aliasSection = config.getConfigurationSection("settings.command-aliases");
+        List<String> aliases = aliasSection != null ? aliasSection.getStringList("base") : Collections.emptyList();
+        if (aliases == null) {
+            aliases = Collections.emptyList();
+        }
+        command.setAliases(aliases);
+
+        SimpleCommandMap commandMap = findCommandMap();
+        if (commandMap == null) {
+            getLogger().warning("Unable to re-register command aliases for /lmb; command map not accessible.");
+            return;
+        }
+
+        try {
+            command.unregister(commandMap);
+            commandMap.register(getDescription().getName().toLowerCase(Locale.ROOT), command);
+        } catch (Exception ex) {
+            getLogger().warning("Failed to re-register /lmb aliases: " + ex.getMessage());
+        }
+    }
+
+    private SimpleCommandMap findCommandMap() {
+        CommandMap map = null;
+        try {
+            map = (CommandMap) Bukkit.getServer().getClass().getMethod("getCommandMap").invoke(Bukkit.getServer());
+        } catch (ReflectiveOperationException ignored) {
+        }
+
+        if (map instanceof SimpleCommandMap) {
+            return (SimpleCommandMap) map;
+        }
+
+        try {
+            var field = Bukkit.getServer().getClass().getDeclaredField("commandMap");
+            field.setAccessible(true);
+            map = (CommandMap) field.get(Bukkit.getServer());
+            if (map instanceof SimpleCommandMap) {
+                return (SimpleCommandMap) map;
+            }
+        } catch (ReflectiveOperationException ignored) {
+        }
+        return null;
     }
 }
