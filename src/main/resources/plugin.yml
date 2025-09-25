@@ -32,10 +32,10 @@ permissions:
     default: op
   lammailbox.compose:
     description: Allows composing new mail
-    default: true
+    default: op
   lammailbox.items:
     description: Allows adding items to mail
-    default: true
+    default: op
   lammailbox.reload:
     description: Allows reloading the plugin configuration
     default: op
