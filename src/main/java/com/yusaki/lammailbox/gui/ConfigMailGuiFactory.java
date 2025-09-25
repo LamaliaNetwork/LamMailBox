@@ -81,36 +81,42 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         String receiver = database.getString(dbPath + "receiver", "");
         String message = Objects.requireNonNullElse(database.getString(dbPath + "message"), "").replace("\\n", "\n");
 
-        ItemStack head = new ItemStack(Material.valueOf(config().getString("gui.sent-mail-view.items.receiver-head.material")));
-        SkullMeta headMeta = (SkullMeta) head.getItemMeta();
-        headMeta.setDisplayName(plugin.colorize(config().getString("gui.sent-mail-view.items.receiver-head.name")
-                .replace("%receiver%", receiver)));
-        headMeta.setOwningPlayer(Bukkit.getOfflinePlayer(receiver));
-        head.setItemMeta(headMeta);
-        inv.setItem(config().getInt("gui.sent-mail-view.items.receiver-head.slot"), head);
+        if (isEnabled("gui.sent-mail-view.items.receiver-head")) {
+            ItemStack head = new ItemStack(Material.valueOf(config().getString("gui.sent-mail-view.items.receiver-head.material")));
+            SkullMeta headMeta = (SkullMeta) head.getItemMeta();
+            headMeta.setDisplayName(plugin.colorize(config().getString("gui.sent-mail-view.items.receiver-head.name")
+                    .replace("%receiver%", receiver)));
+            headMeta.setOwningPlayer(Bukkit.getOfflinePlayer(receiver));
+            head.setItemMeta(headMeta);
+            inv.setItem(config().getInt("gui.sent-mail-view.items.receiver-head.slot"), head);
+        }
 
-        ItemStack messageItem = new ItemStack(Material.valueOf(config().getString("gui.sent-mail-view.items.message.material")));
-        ItemMeta messageMeta = messageItem.getItemMeta();
-        messageMeta.setDisplayName(plugin.colorize(config().getString("gui.sent-mail-view.items.message.name")));
-        List<String> messageLore = Arrays.stream(message.split("\n"))
-                .map(line -> plugin.colorize("&f" + line))
-                .collect(Collectors.toList());
-        messageMeta.setLore(messageLore);
-        messageItem.setItemMeta(messageMeta);
-        inv.setItem(config().getInt("gui.sent-mail-view.items.message.slot"), messageItem);
+        if (isEnabled("gui.sent-mail-view.items.message")) {
+            ItemStack messageItem = new ItemStack(Material.valueOf(config().getString("gui.sent-mail-view.items.message.material")));
+            ItemMeta messageMeta = messageItem.getItemMeta();
+            messageMeta.setDisplayName(plugin.colorize(config().getString("gui.sent-mail-view.items.message.name")));
+            List<String> messageLore = Arrays.stream(message.split("\n"))
+                    .map(line -> plugin.colorize("&f" + line))
+                    .collect(Collectors.toList());
+            messageMeta.setLore(messageLore);
+            messageItem.setItemMeta(messageMeta);
+            inv.setItem(config().getInt("gui.sent-mail-view.items.message.slot"), messageItem);
+        }
 
         List<String> serializedItems = database.getStringList(dbPath + "items");
         List<ItemStack> items = serializedItems.stream()
                 .map(ItemSerialization::deserializeItem)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
-        List<Integer> itemSlots = config().getIntegerList("gui.sent-mail-view.items.items-display.slots");
-        for (int i = 0; i < Math.min(items.size(), itemSlots.size()); i++) {
-            inv.setItem(itemSlots.get(i), items.get(i));
+        if (isEnabled("gui.sent-mail-view.items.items-display")) {
+            List<Integer> itemSlots = config().getIntegerList("gui.sent-mail-view.items.items-display.slots");
+            for (int i = 0; i < Math.min(items.size(), itemSlots.size()); i++) {
+                inv.setItem(itemSlots.get(i), items.get(i));
+            }
         }
 
         List<String> commands = database.getStringList(dbPath + "commands");
-        if (!commands.isEmpty()) {
+        if (!commands.isEmpty() && isEnabled("gui.sent-mail-view.items.command-block")) {
             String serialized = database.getString(dbPath + "command-block");
             ItemStack commandBlock = serialized != null ? ItemSerialization.deserializeItem(serialized)
                     : createDefaultCommandBlock();
@@ -122,7 +128,8 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             }
         }
 
-        if (viewer.hasPermission(config().getString("settings.permissions.delete"))) {
+        if (viewer.hasPermission(config().getString("settings.permissions.delete"))
+                && isEnabled("gui.sent-mail-view.items.delete-button")) {
             ItemStack deleteButton = new ItemStack(Material.valueOf(config().getString("gui.sent-mail-view.items.delete-button.material")));
             ItemMeta deleteMeta = deleteButton.getItemMeta();
             deleteMeta.setDisplayName(plugin.colorize(config().getString("gui.sent-mail-view.items.delete-button.name")));
@@ -149,36 +156,42 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         String sender = database.getString(dbPath + "sender");
         String message = Objects.requireNonNullElse(database.getString(dbPath + "message"), "").replace("\\n", "\n");
 
-        ItemStack head = new ItemStack(Material.valueOf(config().getString("gui.mail-view.items.sender-head.material")));
-        SkullMeta headMeta = (SkullMeta) head.getItemMeta();
-        headMeta.setDisplayName(plugin.colorize(config().getString("gui.mail-view.items.sender-head.name")
-                .replace("%sender%", sender)));
-        headMeta.setOwningPlayer(Bukkit.getOfflinePlayer(sender));
-        head.setItemMeta(headMeta);
-        inv.setItem(config().getInt("gui.mail-view.items.sender-head.slot"), head);
+        if (isEnabled("gui.mail-view.items.sender-head")) {
+            ItemStack head = new ItemStack(Material.valueOf(config().getString("gui.mail-view.items.sender-head.material")));
+            SkullMeta headMeta = (SkullMeta) head.getItemMeta();
+            headMeta.setDisplayName(plugin.colorize(config().getString("gui.mail-view.items.sender-head.name")
+                    .replace("%sender%", sender)));
+            headMeta.setOwningPlayer(Bukkit.getOfflinePlayer(sender));
+            head.setItemMeta(headMeta);
+            inv.setItem(config().getInt("gui.mail-view.items.sender-head.slot"), head);
+        }
 
-        ItemStack messageItem = new ItemStack(Material.valueOf(config().getString("gui.mail-view.items.message.material")));
-        ItemMeta messageMeta = messageItem.getItemMeta();
-        messageMeta.setDisplayName(plugin.colorize(config().getString("gui.mail-view.items.message.name")));
-        List<String> messageLore = Arrays.stream(message.split("\n"))
-                .map(line -> plugin.colorize("&f" + line))
-                .collect(Collectors.toList());
-        messageMeta.setLore(messageLore);
-        messageItem.setItemMeta(messageMeta);
-        inv.setItem(config().getInt("gui.mail-view.items.message.slot"), messageItem);
+        if (isEnabled("gui.mail-view.items.message")) {
+            ItemStack messageItem = new ItemStack(Material.valueOf(config().getString("gui.mail-view.items.message.material")));
+            ItemMeta messageMeta = messageItem.getItemMeta();
+            messageMeta.setDisplayName(plugin.colorize(config().getString("gui.mail-view.items.message.name")));
+            List<String> messageLore = Arrays.stream(message.split("\n"))
+                    .map(line -> plugin.colorize("&f" + line))
+                    .collect(Collectors.toList());
+            messageMeta.setLore(messageLore);
+            messageItem.setItemMeta(messageMeta);
+            inv.setItem(config().getInt("gui.mail-view.items.message.slot"), messageItem);
+        }
 
         List<String> serializedItems = database.getStringList(dbPath + "items");
         List<ItemStack> items = serializedItems.stream()
                 .map(ItemSerialization::deserializeItem)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
-        List<Integer> itemSlots = config().getIntegerList("gui.mail-view.items.items-display.slots");
-        for (int i = 0; i < Math.min(items.size(), itemSlots.size()); i++) {
-            inv.setItem(itemSlots.get(i), items.get(i));
+        if (isEnabled("gui.mail-view.items.items-display")) {
+            List<Integer> itemSlots = config().getIntegerList("gui.mail-view.items.items-display.slots");
+            for (int i = 0; i < Math.min(items.size(), itemSlots.size()); i++) {
+                inv.setItem(itemSlots.get(i), items.get(i));
+            }
         }
 
         List<String> commands = database.getStringList(dbPath + "commands");
-        if (!commands.isEmpty()) {
+        if (!commands.isEmpty() && isEnabled("gui.mail-view.items.command-block")) {
             String serialized = database.getString(dbPath + "command-block");
             ItemStack commandBlock = serialized != null ? ItemSerialization.deserializeItem(serialized)
                     : new ItemStack(Material.COMMAND_BLOCK);
@@ -192,6 +205,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
 
         boolean hasRewards = !items.isEmpty() || !commands.isEmpty();
         String buttonPath = hasRewards ? "gui.mail-view.items.claim-button" : "gui.mail-view.items.dismiss-button";
+        if (!isEnabled(buttonPath)) {
+            return inv;
+        }
         String materialName = config().getString(buttonPath + ".material");
         if (materialName == null || materialName.isEmpty()) {
             materialName = config().getString("gui.mail-view.items.claim-button.material", Material.GREEN_TERRACOTTA.name());
@@ -231,87 +247,105 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         Inventory inv = Bukkit.createInventory(null, size, plugin.colorize(config().getString("gui.create-mail.title")));
         addDecorations(inv, "gui.create-mail");
 
-        ItemStack head = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.receiver-head.material")));
-        SkullMeta headMeta = (SkullMeta) head.getItemMeta();
-        headMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.receiver-head.name")));
-        List<String> headLore = viewer.hasPermission(config().getString("settings.admin-permission")) ?
-                config().getStringList("gui.create-mail.items.receiver-head.adminlore") :
-                config().getStringList("gui.create-mail.items.receiver-head.lore");
-        List<String> lore = headLore.stream().map(plugin::colorize).collect(Collectors.toList());
-        if (session.getReceiver() != null) {
-            lore.add(plugin.colorize(config().getString("gui.create-mail.items.receiver-head.current-receiver-format")
-                    .replace("%receiver%", session.getReceiver())));
+        if (isEnabled("gui.create-mail.items.receiver-head")) {
+            ItemStack head = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.receiver-head.material")));
+            SkullMeta headMeta = (SkullMeta) head.getItemMeta();
+            headMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.receiver-head.name")));
+            List<String> headLore = viewer.hasPermission(config().getString("settings.admin-permission")) ?
+                    config().getStringList("gui.create-mail.items.receiver-head.adminlore") :
+                    config().getStringList("gui.create-mail.items.receiver-head.lore");
+            List<String> lore = headLore.stream().map(plugin::colorize).collect(Collectors.toList());
+            if (session.getReceiver() != null) {
+                lore.add(plugin.colorize(config().getString("gui.create-mail.items.receiver-head.current-receiver-format")
+                        .replace("%receiver%", session.getReceiver())));
+            }
+            headMeta.setLore(lore);
+            head.setItemMeta(headMeta);
+            inv.setItem(config().getInt("gui.create-mail.items.receiver-head.slot"), head);
         }
-        headMeta.setLore(lore);
-        head.setItemMeta(headMeta);
-        inv.setItem(config().getInt("gui.create-mail.items.receiver-head.slot"), head);
 
-        ItemStack paper = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.message-paper.material")));
-        ItemMeta paperMeta = paper.getItemMeta();
-        paperMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.message-paper.name")));
-        List<String> paperLore = new ArrayList<>(config().getStringList("gui.create-mail.items.message-paper.lore"));
-        paperLore = paperLore.stream().map(plugin::colorize).collect(Collectors.toList());
-        if (session.getMessage() != null) {
-            paperLore.add(plugin.colorize(config().getString("gui.create-mail.items.message-paper.current-message-prefix")));
-            paperLore.addAll(Arrays.stream(session.getMessage().split("\n"))
-                    .map(line -> plugin.colorize(config().getString("gui.create-mail.items.message-paper.message-line-format") + line))
-                    .collect(Collectors.toList()));
+        if (isEnabled("gui.create-mail.items.message-paper")) {
+            ItemStack paper = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.message-paper.material")));
+            ItemMeta paperMeta = paper.getItemMeta();
+            paperMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.message-paper.name")));
+            List<String> paperLore = new ArrayList<>(config().getStringList("gui.create-mail.items.message-paper.lore"));
+            paperLore = paperLore.stream().map(plugin::colorize).collect(Collectors.toList());
+            if (session.getMessage() != null) {
+                paperLore.add(plugin.colorize(config().getString("gui.create-mail.items.message-paper.current-message-prefix")));
+                paperLore.addAll(Arrays.stream(session.getMessage().split("\n"))
+                        .map(line -> plugin.colorize(config().getString("gui.create-mail.items.message-paper.message-line-format") + line))
+                        .collect(Collectors.toList()));
+            }
+            paperMeta.setLore(paperLore);
+            paper.setItemMeta(paperMeta);
+            inv.setItem(config().getInt("gui.create-mail.items.message-paper.slot"), paper);
         }
-        paperMeta.setLore(paperLore);
-        paper.setItemMeta(paperMeta);
-        inv.setItem(config().getInt("gui.create-mail.items.message-paper.slot"), paper);
 
-        int chestSlot = config().getInt("gui.create-mail.items.items-chest.slot");
-        if (viewer.hasPermission(config().getString("settings.permissions.add-items"))) {
-            ItemStack chest = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.items-chest.material")));
-            ItemMeta chestMeta = chest.getItemMeta();
-            chestMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.items-chest.name")));
-            chestMeta.setLore(config().getStringList("gui.create-mail.items.items-chest.lore").stream()
+        if (isEnabled("gui.create-mail.items.items-chest")) {
+            int chestSlot = config().getInt("gui.create-mail.items.items-chest.slot");
+            if (viewer.hasPermission(config().getString("settings.permissions.add-items"))) {
+                ItemStack chest = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.items-chest.material")));
+                ItemMeta chestMeta = chest.getItemMeta();
+                chestMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.items-chest.name")));
+                chestMeta.setLore(config().getStringList("gui.create-mail.items.items-chest.lore").stream()
+                        .map(plugin::colorize)
+                        .collect(Collectors.toList()));
+                chest.setItemMeta(chestMeta);
+                inv.setItem(chestSlot, chest);
+            } else {
+                inv.setItem(chestSlot, createDisabledFiller());
+            }
+        }
+
+        if (isEnabled("gui.create-mail.items.send-button")) {
+            ItemStack sendButton = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.send-button.material")));
+            ItemMeta sendMeta = sendButton.getItemMeta();
+            sendMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.send-button.name")));
+            sendMeta.setLore(config().getStringList("gui.create-mail.items.send-button.lore").stream()
                     .map(plugin::colorize)
                     .collect(Collectors.toList()));
-            chest.setItemMeta(chestMeta);
-            inv.setItem(chestSlot, chest);
-        } else {
-            inv.setItem(chestSlot, createDisabledFiller());
+            sendButton.setItemMeta(sendMeta);
+            inv.setItem(config().getInt("gui.create-mail.items.send-button.slot"), sendButton);
         }
-
-        ItemStack sendButton = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.send-button.material")));
-        ItemMeta sendMeta = sendButton.getItemMeta();
-        sendMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.send-button.name")));
-        sendMeta.setLore(config().getStringList("gui.create-mail.items.send-button.lore").stream()
-                .map(plugin::colorize)
-                .collect(Collectors.toList()));
-        sendButton.setItemMeta(sendMeta);
-        inv.setItem(config().getInt("gui.create-mail.items.send-button.slot"), sendButton);
 
         int commandSlot = config().getInt("gui.create-mail.items.command-block.slot");
         int clockSlot = config().getInt("gui.create-mail.items.schedule-clock.slot");
+        boolean commandEnabled = isEnabled("gui.create-mail.items.command-block");
+        boolean clockEnabled = isEnabled("gui.create-mail.items.schedule-clock");
         if (viewer.hasPermission(config().getString("settings.admin-permission"))) {
-            ItemStack commandBlock = session.getDisplayCommandBlock() != null ?
-                    session.getDisplayCommandBlock().clone() : createDefaultCommandBlock();
-            inv.setItem(commandSlot, commandBlock);
+            if (commandEnabled) {
+                ItemStack commandBlock = session.getDisplayCommandBlock() != null ?
+                        session.getDisplayCommandBlock().clone() : createDefaultCommandBlock();
+                inv.setItem(commandSlot, commandBlock);
+            }
 
-            ItemStack clock = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.schedule-clock.material")));
-            ItemMeta clockMeta = clock.getItemMeta();
-            clockMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.schedule-clock.name")));
+            if (clockEnabled) {
+                ItemStack clock = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.schedule-clock.material")));
+                ItemMeta clockMeta = clock.getItemMeta();
+                clockMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.schedule-clock.name")));
 
-            // Replace schedule and expire time placeholders
-            String scheduleTime = session.getScheduleDate() != null ?
-                    new java.text.SimpleDateFormat("yyyy:MM:dd:HH:mm").format(new java.util.Date(session.getScheduleDate())) :
-                    "Not set";
-            String expireTime = session.getExpireDate() != null ?
-                    new java.text.SimpleDateFormat("yyyy:MM:dd:HH:mm").format(new java.util.Date(session.getExpireDate())) :
-                    "Not set";
+                // Replace schedule and expire time placeholders
+                String scheduleTime = session.getScheduleDate() != null ?
+                        new java.text.SimpleDateFormat("yyyy:MM:dd:HH:mm").format(new java.util.Date(session.getScheduleDate())) :
+                        "Not set";
+                String expireTime = session.getExpireDate() != null ?
+                        new java.text.SimpleDateFormat("yyyy:MM:dd:HH:mm").format(new java.util.Date(session.getExpireDate())) :
+                        "Not set";
 
-            clockMeta.setLore(config().getStringList("gui.create-mail.items.schedule-clock.lore").stream()
-                    .map(line -> line.replace("%schedule_time%", scheduleTime).replace("%expire_time%", expireTime))
-                    .map(plugin::colorize)
-                    .collect(Collectors.toList()));
-            clock.setItemMeta(clockMeta);
-            inv.setItem(clockSlot, clock);
+                clockMeta.setLore(config().getStringList("gui.create-mail.items.schedule-clock.lore").stream()
+                        .map(line -> line.replace("%schedule_time%", scheduleTime).replace("%expire_time%", expireTime))
+                        .map(plugin::colorize)
+                        .collect(Collectors.toList()));
+                clock.setItemMeta(clockMeta);
+                inv.setItem(clockSlot, clock);
+            }
         } else {
-            inv.setItem(commandSlot, createDisabledFiller());
-            inv.setItem(clockSlot, createDisabledFiller());
+            if (commandEnabled) {
+                inv.setItem(commandSlot, createDisabledFiller());
+            }
+            if (clockEnabled) {
+                inv.setItem(clockSlot, createDisabledFiller());
+            }
         }
 
         return inv;
@@ -327,18 +361,23 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             session.getItems().forEach(item -> inv.addItem(item.clone()));
         }
 
-        ItemStack saveButton = new ItemStack(Material.valueOf(config().getString("gui.items.items.save-button.material")));
-        ItemMeta saveMeta = saveButton.getItemMeta();
-        saveMeta.setDisplayName(plugin.colorize(config().getString("gui.items.items.save-button.name")));
-        saveMeta.setLore(config().getStringList("gui.items.items.save-button.lore").stream()
-                .map(plugin::colorize)
-                .collect(Collectors.toList()));
-        saveButton.setItemMeta(saveMeta);
-        inv.setItem(config().getInt("gui.items.items.save-button.slot"), saveButton);
+        if (isEnabled("gui.items.items.save-button")) {
+            ItemStack saveButton = new ItemStack(Material.valueOf(config().getString("gui.items.items.save-button.material")));
+            ItemMeta saveMeta = saveButton.getItemMeta();
+            saveMeta.setDisplayName(plugin.colorize(config().getString("gui.items.items.save-button.name")));
+            saveMeta.setLore(config().getStringList("gui.items.items.save-button.lore").stream()
+                    .map(plugin::colorize)
+                    .collect(Collectors.toList()));
+            saveButton.setItemMeta(saveMeta);
+            inv.setItem(config().getInt("gui.items.items.save-button.slot"), saveButton);
+        }
         return inv;
     }
 
     private void addCreateMailButton(Inventory inv, Player viewer, Player target) {
+        if (!isEnabled("gui.main.items.create-mail")) {
+            return;
+        }
         ItemStack createBook = new ItemStack(Material.valueOf(config().getString("gui.main.items.create-mail.material")));
         ItemMeta bookMeta = createBook.getItemMeta();
         bookMeta.setDisplayName(plugin.colorize(config().getString("gui.main.items.create-mail.name")));
@@ -357,6 +396,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
     }
 
     private void addSentMailButton(Inventory inv) {
+        if (!isEnabled("gui.main.items.sent-mail")) {
+            return;
+        }
         ItemStack sentMailButton = new ItemStack(Material.valueOf(config().getString("gui.main.items.sent-mail.material")));
         ItemMeta sentMailMeta = sentMailButton.getItemMeta();
         sentMailMeta.setDisplayName(plugin.colorize(config().getString("gui.main.items.sent-mail.name")));
@@ -368,6 +410,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
     }
 
     private void addBackButton(Inventory inv) {
+        if (!isEnabled("gui.sent-mail.items.back-button")) {
+            return;
+        }
         ItemStack backButton = new ItemStack(Material.valueOf(config().getString("gui.sent-mail.items.back-button.material")));
         ItemMeta backMeta = backButton.getItemMeta();
         backMeta.setDisplayName(plugin.colorize(config().getString("gui.sent-mail.items.back-button.name")));
@@ -380,6 +425,10 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
 
     private void loadPlayerMails(Player viewer, Player target, Inventory inv) {
         if (!database().contains("mails")) {
+            return;
+        }
+
+        if (!isEnabled("gui.main.items.mail-display")) {
             return;
         }
 
@@ -410,14 +459,20 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
 
             if (shouldDisplay && currentSlot < mailSlots.size()) {
                 ItemStack mailItem = createMailItem(mailId);
-                inv.setItem(mailSlots.get(currentSlot), mailItem);
-                currentSlot++;
+                if (mailItem != null) {
+                    inv.setItem(mailSlots.get(currentSlot), mailItem);
+                    currentSlot++;
+                }
             }
         }
     }
 
     private void loadSentMails(Player viewer, Inventory inv) {
         if (!database().contains("mails")) {
+            return;
+        }
+
+        if (!isEnabled("gui.sent-mail.items.sent-mail-display")) {
             return;
         }
 
@@ -435,8 +490,10 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             String sender = database().getString("mails." + mailId + ".sender");
             if (Objects.equals(sender, targetPlayerName) && currentSlot < mailSlots.size()) {
                 ItemStack mailItem = createSentMailItem(mailId);
-                inv.setItem(mailSlots.get(currentSlot), mailItem);
-                currentSlot++;
+                if (mailItem != null) {
+                    inv.setItem(mailSlots.get(currentSlot), mailItem);
+                    currentSlot++;
+                }
             }
         }
 
@@ -445,6 +502,10 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
     private ItemStack createMailItem(String mailId) {
         boolean isAdminMail = database().getBoolean("mails." + mailId + ".is-admin-mail");
         String itemPath = isAdminMail ? "gui.main.items.admin-mail-display" : "gui.main.items.mail-display";
+
+        if (!isEnabled(itemPath)) {
+            return null;
+        }
 
         ItemStack mailItem = new ItemStack(Material.valueOf(config().getString(itemPath + ".material")));
         ItemMeta meta = mailItem.getItemMeta();
@@ -476,6 +537,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
     }
 
     private ItemStack createSentMailItem(String mailId) {
+        if (!isEnabled("gui.sent-mail.items.sent-mail-display")) {
+            return null;
+        }
         ItemStack item = new ItemStack(Material.valueOf(config().getString("gui.sent-mail.items.sent-mail-display.material")));
         ItemMeta meta = item.getItemMeta();
         String receiver = database().getString("mails." + mailId + ".receiver", "");
@@ -533,6 +597,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
         for (String decorKey : decorSection.getKeys(false)) {
             String path = guiPath + ".decoration." + decorKey;
+            if (!isEnabled(path)) {
+                continue;
+            }
             Material material = Material.valueOf(config().getString(path + ".material"));
             String name = config().getString(path + ".name");
             List<Integer> slots = config().getIntegerList(path + ".slots");
@@ -540,6 +607,19 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             ItemStack decorItem = new ItemStack(material);
             ItemMeta meta = decorItem.getItemMeta();
             meta.setDisplayName(plugin.colorize(name));
+            List<String> loreLines = config().getStringList(path + ".lore");
+            if (!loreLines.isEmpty()) {
+                meta.setLore(loreLines.stream()
+                        .map(plugin::colorize)
+                        .collect(Collectors.toList()));
+            }
+            List<String> commands = config().getStringList(path + ".commands").stream()
+                    .filter(line -> line != null && !line.trim().isEmpty())
+                    .collect(Collectors.toList());
+            if (!commands.isEmpty()) {
+                meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "decorationPath"),
+                        PersistentDataType.STRING, path);
+            }
             decorItem.setItemMeta(meta);
             for (int slot : slots) {
                 inv.setItem(slot, decorItem.clone());
@@ -576,6 +656,10 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                 .collect(Collectors.toList()));
         commandBlock.setItemMeta(meta);
         return commandBlock;
+    }
+
+    private boolean isEnabled(String path) {
+        return config().getBoolean(path + ".enabled", true);
     }
 
     private ItemStack createDisabledFiller() {

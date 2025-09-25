@@ -20,9 +20,11 @@ import java.util.stream.Collectors;
 
 public class InventoryClickHandler implements MailInventoryHandler {
     private final LamMailBox plugin;
+    private final NamespacedKey decorationKey;
 
     public InventoryClickHandler(LamMailBox plugin) {
         this.plugin = plugin;
+        this.decorationKey = new NamespacedKey(plugin, "decorationPath");
     }
 
 
@@ -90,7 +92,11 @@ public class InventoryClickHandler implements MailInventoryHandler {
 
     private void handleMainGuiClick(InventoryClickEvent event, Player player, ItemStack clicked) {
         event.setCancelled(true);
-        if (event.getSlot() == config().getInt("gui.main.items.create-mail.slot")) {
+        if (executeDecorationCommand(event, player, clicked)) {
+            return;
+        }
+        if (isEnabled("gui.main.items.create-mail") &&
+                event.getSlot() == config().getInt("gui.main.items.create-mail.slot")) {
             String viewingAs = plugin.getViewingAsPlayer().get(player.getUniqueId());
             if (viewingAs != null) {
                 player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
@@ -100,11 +106,13 @@ public class InventoryClickHandler implements MailInventoryHandler {
             plugin.openCreateMailGUI(player);
             return;
         }
-        if (event.getSlot() == config().getInt("gui.main.items.sent-mail.slot")) {
+        if (isEnabled("gui.main.items.sent-mail") &&
+                event.getSlot() == config().getInt("gui.main.items.sent-mail.slot")) {
             plugin.openSentMailGUI(player);
             return;
         }
-        if (config().getIntegerList("gui.main.items.mail-display.slots").contains(event.getSlot())) {
+        if (isEnabled("gui.main.items.mail-display") &&
+                config().getIntegerList("gui.main.items.mail-display.slots").contains(event.getSlot())) {
             String mailId = getMailId(clicked);
             if (mailId != null) {
                 plugin.openMailView(player, mailId);
@@ -114,7 +122,11 @@ public class InventoryClickHandler implements MailInventoryHandler {
 
     private void handleSentMailGuiClick(InventoryClickEvent event, Player player, ItemStack clicked) {
         event.setCancelled(true);
-        if (event.getSlot() == config().getInt("gui.sent-mail.items.back-button.slot")) {
+        if (executeDecorationCommand(event, player, clicked)) {
+            return;
+        }
+        if (isEnabled("gui.sent-mail.items.back-button") &&
+                event.getSlot() == config().getInt("gui.sent-mail.items.back-button.slot")) {
             String viewingAs = plugin.getViewingAsPlayer().get(player.getUniqueId());
             if (viewingAs != null) {
                 Player target = Bukkit.getPlayer(viewingAs);
@@ -129,7 +141,8 @@ public class InventoryClickHandler implements MailInventoryHandler {
             }
             return;
         }
-        if (config().getIntegerList("gui.sent-mail.items.sent-mail-display.slots").contains(event.getSlot())) {
+        if (isEnabled("gui.sent-mail.items.sent-mail-display") &&
+                config().getIntegerList("gui.sent-mail.items.sent-mail-display.slots").contains(event.getSlot())) {
             String mailId = getMailId(clicked);
             if (mailId != null) {
                 plugin.openSentMailView(player, mailId);
@@ -139,7 +152,11 @@ public class InventoryClickHandler implements MailInventoryHandler {
 
     private void handleSentMailViewClick(InventoryClickEvent event, Player player, ItemStack clicked) {
         event.setCancelled(true);
-        if (event.getSlot() == config().getInt("gui.sent-mail-view.items.delete-button.slot")) {
+        if (executeDecorationCommand(event, player, clicked)) {
+            return;
+        }
+        if (isEnabled("gui.sent-mail-view.items.delete-button") &&
+                event.getSlot() == config().getInt("gui.sent-mail-view.items.delete-button.slot")) {
             String mailId = getMailId(clicked);
             if (mailId != null) {
                 plugin.handleSentMailDelete(player, mailId);
@@ -160,37 +177,51 @@ public class InventoryClickHandler implements MailInventoryHandler {
         if (clicked == null) {
             return;
         }
+        if (executeDecorationCommand(event, p, clicked)) {
+            return;
+        }
         MailCreationSession session = plugin.getMailSessions().get(p.getUniqueId());
         if (session == null) {
             return;
         }
 
         int slot = event.getSlot();
-        if (slot == config().getInt("gui.create-mail.items.receiver-head.slot")) {
+        if (isEnabled("gui.create-mail.items.receiver-head") &&
+                slot == config().getInt("gui.create-mail.items.receiver-head.slot")) {
             onReceiverHeadClick(p);
-        } else if (slot == config().getInt("gui.create-mail.items.message-paper.slot")) {
+        } else if (isEnabled("gui.create-mail.items.message-paper") &&
+                slot == config().getInt("gui.create-mail.items.message-paper.slot")) {
             onMessagePaperClick(p);
-        } else if (slot == config().getInt("gui.create-mail.items.items-chest.slot")) {
+        } else if (isEnabled("gui.create-mail.items.items-chest") &&
+                slot == config().getInt("gui.create-mail.items.items-chest.slot")) {
             if (!p.hasPermission(config().getString("settings.permissions.add-items"))) {
                 p.sendMessage(plugin.colorize(config().getString("messages.no-permission")));
                 return;
             }
             plugin.openItemsGUI(p);
-        } else if (slot == config().getInt("gui.create-mail.items.send-button.slot")) {
+        } else if (isEnabled("gui.create-mail.items.send-button") &&
+                slot == config().getInt("gui.create-mail.items.send-button.slot")) {
             plugin.handleMailSend(p);
-        } else if (slot == config().getInt("gui.create-mail.items.command-block.slot")) {
+        } else if (isEnabled("gui.create-mail.items.command-block") &&
+                slot == config().getInt("gui.create-mail.items.command-block.slot")) {
             if (event.getClick().isRightClick()) {
                 removeLastCommandAndRefresh(p, session);
             } else {
                 handleCommandBlockItem(p, event, session);
             }
-        } else if (slot == config().getInt("gui.create-mail.items.schedule-clock.slot")) {
+        } else if (isEnabled("gui.create-mail.items.schedule-clock") &&
+                slot == config().getInt("gui.create-mail.items.schedule-clock.slot")) {
             handleScheduleClockClick(event, p);
         }
     }
 
     private void handleItemsGuiClick(InventoryClickEvent event) {
-        if (event.getSlot() == config().getInt("gui.items.items.save-button.slot")) {
+        ItemStack clicked = event.getCurrentItem();
+        if (clicked != null && executeDecorationCommand(event, (Player) event.getWhoClicked(), clicked)) {
+            return;
+        }
+        if (isEnabled("gui.items.items.save-button") &&
+                event.getSlot() == config().getInt("gui.items.items.save-button.slot")) {
             event.setCancelled(true);
             Player player = (Player) event.getWhoClicked();
             MailCreationSession session = plugin.getMailSessions().get(player.getUniqueId());
@@ -211,12 +242,56 @@ public class InventoryClickHandler implements MailInventoryHandler {
 
     private void handleMailViewClick(InventoryClickEvent event, Player player, ItemStack clicked) {
         event.setCancelled(true);
-        if (event.getSlot() == config().getInt("gui.mail-view.items.claim-button.slot")) {
+        if (executeDecorationCommand(event, player, clicked)) {
+            return;
+        }
+        int buttonSlot = config().getInt("gui.mail-view.items.claim-button.slot");
+        if ((isEnabled("gui.mail-view.items.claim-button") || isEnabled("gui.mail-view.items.dismiss-button"))
+                && event.getSlot() == buttonSlot) {
             String mailId = getMailId(clicked);
             if (mailId != null) {
                 handleMailClaim(player, mailId);
             }
         }
+    }
+
+    private boolean isEnabled(String path) {
+        return config().getBoolean(path + ".enabled", true);
+    }
+
+    private boolean executeDecorationCommand(InventoryClickEvent event, Player player, ItemStack clicked) {
+        if (clicked == null) {
+            return false;
+        }
+        ItemMeta meta = clicked.getItemMeta();
+        if (meta == null) {
+            return false;
+        }
+        String configPath = meta.getPersistentDataContainer().get(decorationKey, PersistentDataType.STRING);
+        if (configPath == null || configPath.isEmpty()) {
+            return false;
+        }
+
+        List<String> commands = config().getStringList(configPath + ".commands");
+        if (commands.isEmpty()) {
+            return false;
+        }
+
+        event.setCancelled(true);
+        String playerName = player.getName();
+        String uuid = player.getUniqueId().toString();
+        plugin.getFoliaLib().getScheduler().runNextTick(task -> {
+            for (String template : commands) {
+                if (template == null || template.trim().isEmpty()) {
+                    continue;
+                }
+                String command = template
+                        .replace("%player%", playerName)
+                        .replace("%uuid%", uuid);
+                Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+            }
+        });
+        return true;
     }
 
     private void onReceiverHeadClick(Player player) {
