@@ -39,7 +39,7 @@ Aliases: `/mailbox`, `/mail`
 ## Setup
 
 1. Drop the jar in `plugins/` and start the server to generate config/database files.
-2. Edit `plugins/LamMailBox/config.yml` to customize GUI text, slots, and notification settings.
+2. Edit `plugins/LamMailBox/config.yml` to customize GUI text, slots, and notification settings. Set `enabled: false` on any button entry to remove it from the interface. Decoration fillers (new in v1.3.0) can also run console commands via the `commands` list, with `%player%` and `%uuid%` placeholders.
 3. Grant the permissions that fit your ranks.
 4. Compose mail through the GUI or use `/lmb send` (or another plugin trigger) for automated deliveries.
 
