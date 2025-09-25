@@ -319,6 +319,9 @@ public class InventoryClickHandler implements MailInventoryHandler {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
+        List<String> commands = database().getStringList(dbPath + "commands");
+        boolean hasRewards = !items.isEmpty() || !commands.isEmpty();
+
         if (!items.isEmpty()) {
             long emptySlots = Arrays.stream(player.getInventory().getStorageContents())
                     .filter(item -> item == null || item.getType() == Material.AIR)
@@ -333,7 +336,6 @@ public class InventoryClickHandler implements MailInventoryHandler {
             items.forEach(item -> player.getInventory().addItem(item));
         }
 
-        List<String> commands = database().getStringList(dbPath + "commands");
         if (!commands.isEmpty()) {
             plugin.getFoliaLib().getScheduler().runNextTick(task -> {
                 for (String command : commands) {
@@ -346,8 +348,9 @@ public class InventoryClickHandler implements MailInventoryHandler {
         plugin.getMailService().claimMail(player, mailId);
         player.closeInventory();
         plugin.openMainGUI(player);
+        String messageKey = hasRewards ? "messages.items-claimed" : "messages.no-items-in-mail";
         player.sendMessage(plugin.colorize(plugin.getConfig().getString("messages.prefix") +
-                plugin.getConfig().getString("messages.items-claimed")));
+                plugin.getConfig().getString(messageKey)));
     }
 
     private void onItemsGuiClose(InventoryCloseEvent event, Player player) {
