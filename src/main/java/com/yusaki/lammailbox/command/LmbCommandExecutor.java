@@ -51,7 +51,7 @@ public class LmbCommandExecutor implements CommandExecutor {
 
         if (args.length < 2) {
             sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                    "&cUsage: /lmb send <users> <message> | [commands]"));
+                    "&cUsage: /lmb send <users> <message> | [commands] | schedule:YYYY:MM:DD:HH:mm | expire:YYYY:MM:DD:HH:mm"));
             return true;
         }
 
@@ -61,30 +61,81 @@ public class LmbCommandExecutor implements CommandExecutor {
         MailCreationSession session = new MailCreationSession();
         session.setReceiver(receiver);
 
+        // Parse message with multiple sections: message | [commands] | schedule:date | expire:date
+        String[] sections = message.split("\\|");
+        String messageContent = sections[0].trim();
         List<String> commands = new ArrayList<>();
-        String messageContent = message;
-        if (message.contains("|")) {
-            String[] parts = message.split("\\|", 2);
-            messageContent = parts[0].trim();
+        Long scheduleDate = null;
+        Long expireDate = null;
 
-            if (sender instanceof Player && !sender.hasPermission(config.getString("settings.admin-permission"))) {
-                sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                        config.getString("messages.no-permission")));
-                return true;
-            }
+        // Process each section
+        for (int i = 1; i < sections.length; i++) {
+            String section = sections[i].trim();
 
-            String[] commandParts = parts[1].trim().split(",");
-            for (String commandPart : commandParts) {
-                if (!commandPart.trim().isEmpty()) {
-                    commands.add(commandPart.trim());
+            if (section.startsWith("schedule:")) {
+                // Parse schedule date
+                String dateStr = section.substring(9).trim();
+                scheduleDate = parseDateString(dateStr);
+                if (scheduleDate == null) {
+                    sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
+                            config.getString("messages.invalid-date-format")));
+                    return true;
+                }
+            } else if (section.startsWith("expire:")) {
+                // Parse expire date
+                String dateStr = section.substring(7).trim();
+                expireDate = parseDateString(dateStr);
+                if (expireDate == null) {
+                    sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
+                            config.getString("messages.invalid-date-format")));
+                    return true;
+                }
+            } else if (!section.isEmpty()) {
+                // Parse commands section
+                if (sender instanceof Player && !sender.hasPermission(config.getString("settings.admin-permission"))) {
+                    sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
+                            config.getString("messages.no-permission")));
+                    return true;
+                }
+
+                // Support both comma-separated and bracket format
+                if (section.contains("[") && section.contains("]")) {
+                    // Bracket format: [give {player} diamond] [xp add {player} 100]
+                    String[] commandParts = section.split("\\]\\s*\\[");
+                    for (String commandPart : commandParts) {
+                        String cmd = commandPart.replaceAll("[\\[\\]]", "").trim();
+                        if (!cmd.isEmpty()) {
+                            commands.add(cmd);
+                        }
+                    }
+                } else {
+                    // Comma-separated format: give {player} diamond, xp add {player} 100
+                    String[] commandParts = section.split(",");
+                    for (String commandPart : commandParts) {
+                        String cmd = commandPart.trim();
+                        if (!cmd.isEmpty()) {
+                            commands.add(cmd);
+                        }
+                    }
                 }
             }
         }
 
         session.setMessage(messageContent);
         session.setCommands(commands);
-        long expireTime = System.currentTimeMillis() + (365L * 24 * 60 * 60 * 1000);
-        session.setExpireDate(expireTime);
+
+        // Set schedule date if provided
+        if (scheduleDate != null) {
+            session.setScheduleDate(scheduleDate);
+        }
+
+        // Set expire date or default to 1 year
+        if (expireDate != null) {
+            session.setExpireDate(expireDate);
+        } else {
+            long defaultExpire = System.currentTimeMillis() + (365L * 24 * 60 * 60 * 1000);
+            session.setExpireDate(defaultExpire);
+        }
 
         try {
             if (sender instanceof Player) {
@@ -225,5 +276,35 @@ public class LmbCommandExecutor implements CommandExecutor {
         Player player = (Player) sender;
         plugin.openMainGUI(player);
         return true;
+    }
+
+    /**
+     * Parses date string in format YYYY:MM:DD:HH:mm to timestamp
+     */
+    private Long parseDateString(String dateStr) {
+        if (dateStr == null || dateStr.isEmpty()) {
+            return null;
+        }
+
+        try {
+            String[] parts = dateStr.split(":");
+            if (parts.length != 5) {
+                return null;
+            }
+
+            int year = Integer.parseInt(parts[0]);
+            int month = Integer.parseInt(parts[1]) - 1; // Calendar months are 0-based
+            int day = Integer.parseInt(parts[2]);
+            int hour = Integer.parseInt(parts[3]);
+            int minute = Integer.parseInt(parts[4]);
+
+            java.util.Calendar calendar = java.util.Calendar.getInstance();
+            calendar.set(year, month, day, hour, minute, 0);
+            calendar.set(java.util.Calendar.MILLISECOND, 0);
+
+            return calendar.getTimeInMillis();
+        } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
+            return null;
+        }
     }
 }
