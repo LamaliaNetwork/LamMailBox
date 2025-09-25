@@ -92,7 +92,7 @@ gui:
       border:
         material: BLACK_STAINED_GLASS_PANE
         name: ' '
-        slots: [1,2,3,4,5,6,7,8,9,17,18,26,27,35,36,37,38,39,40,41,42,43]
+        slots: [1,2,3,4,5,6,7,8,9,17,18,26,27,35,36,37,38,39,40,41,42,43,44]
     items:
       receiver-head:
         material: PLAYER_HEAD
@@ -228,6 +228,12 @@ gui:
           - "&7ᴄʟɪᴄᴋ ᴛᴏ ᴄʟᴀɪᴍ"
         slot: 44
 
+      dismiss-button:
+        material: GREEN_TERRACOTTA
+        name: "&aᴍᴀʀᴋ ᴀs ʀᴇᴀᴅ"
+        lore:
+          - "&7ᴄʟɪᴄᴋ ᴛᴏ ᴅɪsᴍɪss"
+
 
 messages:
   prefix: '&8[&6✉ LamMailBox&8] '
@@ -258,7 +264,7 @@ messages:
   expire-set: "&a✔ Mail will expire on: %date%"
   self-mail: '&c✖ You cannot send mail to yourself!'
   reload-success: '&a✔ Configuration reloaded successfully!'
-  no-items-in-mail: '&7No items to claim in this mail.'
+  no-items-in-mail: '&a✔ Mail marked as read.'
   mail-deleted: '&a✔ Mail deleted successfully!'
   no-sent-mail: '&7You have no sent mail to view.'
   delete-confirmation: '&c⚠ Are you sure you want to delete this mail? Click again to confirm.'
