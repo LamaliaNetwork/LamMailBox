@@ -91,7 +91,10 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             SkullMeta headMeta = (SkullMeta) head.getItemMeta();
             headMeta.setDisplayName(plugin.colorize(config().getString("gui.sent-mail-view.items.receiver-head.name")
                     .replace("%receiver%", receiver)));
-            headMeta.setOwningPlayer(Bukkit.getOfflinePlayer(receiver));
+            // Only set owning player if receiver is not empty and contains valid characters
+            if (receiver != null && !receiver.trim().isEmpty() && receiver.matches("^[a-zA-Z0-9_]{1,16}$")) {
+                headMeta.setOwningPlayer(Bukkit.getOfflinePlayer(receiver));
+            }
             head.setItemMeta(headMeta);
             inv.setItem(config().getInt("gui.sent-mail-view.items.receiver-head.slot"), head);
         }
@@ -127,35 +130,6 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                 commandBlock.setItemMeta(commandMeta);
                 inv.setItem(config().getInt("gui.sent-mail-view.items.command-block.slot"), commandBlock);
             }
-        }
-
-        if (record.isAdminMail() && isEnabled("gui.sent-mail-view.items.admin-flag")) {
-            ItemStack flag = new ItemStack(Material.valueOf(config().getString("gui.sent-mail-view.items.admin-flag.material")));
-            ItemMeta flagMeta = flag.getItemMeta();
-            flagMeta.setDisplayName(plugin.colorize(config().getString("gui.sent-mail-view.items.admin-flag.name")));
-            flagMeta.setLore(config().getStringList("gui.sent-mail-view.items.admin-flag.lore").stream()
-                    .map(plugin::colorize)
-                    .collect(Collectors.toList()));
-            flag.setItemMeta(flagMeta);
-            inv.setItem(config().getInt("gui.sent-mail-view.items.admin-flag.slot"), flag);
-        }
-
-        long sentAt = record.sentDate();
-        long expireAt = record.expireDate() != null ? record.expireDate() : 0L;
-        if (isEnabled("gui.sent-mail-view.items.timestamps")) {
-            ItemStack info = new ItemStack(Material.valueOf(config().getString("gui.sent-mail-view.items.timestamps.material")));
-            ItemMeta infoMeta = info.getItemMeta();
-            infoMeta.setDisplayName(plugin.colorize(config().getString("gui.sent-mail-view.items.timestamps.name")));
-            List<String> timestampLore = config().getStringList("gui.sent-mail-view.items.timestamps.lore").stream()
-                    .map(line -> plugin.colorize(line
-                            .replace("%sent_date%", formatDate(sentAt))
-                            .replace("%expire_date%", formatDate(expireAt))
-                            .replace("%sent%", formatDate(sentAt))
-                            .replace("%expire%", formatDate(expireAt))))
-                    .collect(Collectors.toList());
-            infoMeta.setLore(timestampLore);
-            info.setItemMeta(infoMeta);
-            inv.setItem(config().getInt("gui.sent-mail-view.items.timestamps.slot"), info);
         }
 
         if (viewer.hasPermission(config().getString("settings.permissions.delete"))
@@ -196,7 +170,10 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             SkullMeta headMeta = (SkullMeta) head.getItemMeta();
             headMeta.setDisplayName(plugin.colorize(config().getString("gui.mail-view.items.sender-head.name")
                     .replace("%sender%", sender)));
-            headMeta.setOwningPlayer(Bukkit.getOfflinePlayer(sender));
+            // Only set owning player if sender is not empty and contains valid characters
+            if (sender != null && !sender.trim().isEmpty() && sender.matches("^[a-zA-Z0-9_]{1,16}$")) {
+                headMeta.setOwningPlayer(Bukkit.getOfflinePlayer(sender));
+            }
             head.setItemMeta(headMeta);
             inv.setItem(config().getInt("gui.mail-view.items.sender-head.slot"), head);
         }

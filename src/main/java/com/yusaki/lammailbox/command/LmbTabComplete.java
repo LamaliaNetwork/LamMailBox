@@ -1,6 +1,7 @@
 package com.yusaki.lammailbox.command;
 
 import com.yusaki.lammailbox.LamMailBox;
+import com.yusaki.lammailbox.config.StorageSettings;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
@@ -9,6 +10,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -25,6 +27,13 @@ public class LmbTabComplete implements TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         FileConfiguration config = plugin.getConfig();
+        
+        // Handle lmbmigrate command
+        if (command.getName().equals("lmbmigrate")) {
+            return handleMigrateTabComplete(sender, args, config);
+        }
+        
+        // Handle lmb command (existing logic)
         if (args.length == 1) {
             String current = args[0].toLowerCase();
             List<String> completions = new ArrayList<>();
@@ -84,6 +93,38 @@ public class LmbTabComplete implements TabCompleter {
             }
         }
 
+        return new ArrayList<>();
+    }
+    
+    private List<String> handleMigrateTabComplete(CommandSender sender, String[] args, FileConfiguration config) {
+        String permission = config.getString("settings.permissions.migrate", "lammailbox.migrate");
+        
+        // Check if sender has permission to use the command
+        if (!sender.hasPermission(permission)) {
+            return new ArrayList<>();
+        }
+        
+        // Get all available storage backend types
+        List<String> storageTypes = Arrays.stream(StorageSettings.BackendType.values())
+                .map(type -> type.name().toLowerCase())
+                .collect(Collectors.toList());
+        
+        if (args.length == 1) {
+            // First argument: source storage type
+            String current = args[0].toLowerCase();
+            return storageTypes.stream()
+                    .filter(type -> type.startsWith(current))
+                    .collect(Collectors.toList());
+        } else if (args.length == 2) {
+            // Second argument: target storage type (exclude the source type)
+            String sourceType = args[0].toLowerCase();
+            String current = args[1].toLowerCase();
+            return storageTypes.stream()
+                    .filter(type -> !type.equals(sourceType)) // Don't suggest the same as source
+                    .filter(type -> type.startsWith(current))
+                    .collect(Collectors.toList());
+        }
+        
         return new ArrayList<>();
     }
 }

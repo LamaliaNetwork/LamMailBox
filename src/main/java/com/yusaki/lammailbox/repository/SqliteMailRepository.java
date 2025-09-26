@@ -1,11 +1,12 @@
 package com.yusaki.lammailbox.repository;
 
-import com.yusaki.lammailbox.config.StorageSettings;
+
 import com.yusaki.lammailbox.util.ItemSerialization;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.sqlite.SQLiteDataSource;
 
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -26,19 +27,17 @@ import java.util.Optional;
 public class SqliteMailRepository implements MailRepository {
     private static final Map<String, String> COLUMN_MAPPING = createColumnMapping();
     private final JavaPlugin plugin;
-    private final StorageSettings.SqliteSettings settings;
     private final SQLiteDataSource dataSource;
 
-    public SqliteMailRepository(JavaPlugin plugin, StorageSettings.SqliteSettings settings) {
+    public SqliteMailRepository(JavaPlugin plugin, Path databasePath) {
         this.plugin = plugin;
-        this.settings = settings;
-        this.dataSource = createDataSource(settings);
+        this.dataSource = createDataSource(databasePath);
         initialize();
     }
 
-    private SQLiteDataSource createDataSource(StorageSettings.SqliteSettings settings) {
+    private SQLiteDataSource createDataSource(Path databasePath) {
         SQLiteDataSource dataSource = new SQLiteDataSource();
-        dataSource.setUrl("jdbc:sqlite:" + settings.databasePath().toAbsolutePath());
+        dataSource.setUrl("jdbc:sqlite:" + databasePath.toAbsolutePath());
         return dataSource;
     }
 
@@ -83,9 +82,7 @@ public class SqliteMailRepository implements MailRepository {
             plugin.getLogger().severe("Failed to initialize SQLite database: " + e.getMessage());
         }
 
-        if (settings.importFromYaml()) {
-            migrateFromYamlIfNeeded();
-        }
+
     }
 
     private Connection getConnection() throws SQLException {
@@ -96,38 +93,7 @@ public class SqliteMailRepository implements MailRepository {
         return connection;
     }
 
-    private void migrateFromYamlIfNeeded() {
-        if (!isDatabaseEmpty()) {
-            return;
-        }
 
-        YamlMailRepository yamlRepository = new YamlMailRepository(plugin);
-        List<String> legacyIds = yamlRepository.listMailIds();
-        if (legacyIds.isEmpty()) {
-            return;
-        }
-
-        plugin.getLogger().info("Migrating " + legacyIds.size() + " mails from YAML to SQLite storage...");
-        for (String mailId : legacyIds) {
-            Map<String, Object> data = yamlRepository.loadMail(mailId);
-            saveMail(mailId, data);
-            List<ItemStack> items = yamlRepository.loadMailItems(mailId);
-            saveMailItems(mailId, items);
-        }
-        plugin.getLogger().info("SQLite migration complete.");
-    }
-
-    private boolean isDatabaseEmpty() {
-        String sql = "SELECT COUNT(*) FROM mail";
-        try (Connection connection = getConnection();
-             PreparedStatement statement = connection.prepareStatement(sql);
-             ResultSet resultSet = statement.executeQuery()) {
-            return resultSet.next() && resultSet.getLong(1) == 0L;
-        } catch (SQLException e) {
-            plugin.getLogger().warning("Could not determine if SQLite database is empty: " + e.getMessage());
-            return false;
-        }
-    }
 
     @Override
     public Map<String, Object> loadMail(String mailId) {

@@ -332,6 +332,7 @@ messages:
   migrate-usage: '&cUsage: /lmbmigrate <source> <target>'
   migrate-invalid: '&c✖ Unknown storage type: %type%'
   migrate-same: '&c✖ Source and target storage must be different.'
+  migrate-target-not-empty: '&c✖ Target storage contains %count% mail entries. Please clear the target storage first or choose an empty target.'
   migrate-start: '&eMigrating mail from &f%source% &eto &f%target%&e...'
   migrate-empty: '&eNo mail entries found in %source% storage.'
   migrate-success: '&a✔ Migration complete: %count% mails moved to %target%.'

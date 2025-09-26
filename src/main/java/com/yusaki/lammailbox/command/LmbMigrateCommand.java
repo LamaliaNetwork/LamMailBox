@@ -70,14 +70,19 @@ public class LmbMigrateCommand implements CommandExecutor {
                 return true;
             }
 
+            // Check if target database is empty before proceeding
+            List<String> targetIds = targetRepo.listMailIds();
+            if (!targetIds.isEmpty()) {
+                sender.sendMessage(plugin.colorize(prefix + config.getString("messages.migrate-target-not-empty", 
+                    "&c✖ Target storage contains %count% mail entries. Please clear the target storage first or choose an empty target.")
+                    .replace("%count%", String.valueOf(targetIds.size()))
+                    .replace("%target%", args[1].toLowerCase(Locale.ROOT))));
+                return true;
+            }
+
             sender.sendMessage(plugin.colorize(prefix + config.getString("messages.migrate-start", "&eMigrating mail from %source% to %target%...")
                     .replace("%source%", args[0].toLowerCase(Locale.ROOT))
                     .replace("%target%", args[1].toLowerCase(Locale.ROOT))));
-
-            // Clear existing target entries
-            for (String existingId : targetRepo.listMailIds()) {
-                targetRepo.deleteMail(existingId);
-            }
 
             int migrated = 0;
             for (String mailId : sourceIds) {

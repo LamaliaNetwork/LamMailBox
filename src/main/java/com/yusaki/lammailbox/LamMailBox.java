@@ -80,10 +80,12 @@ public class LamMailBox extends JavaPlugin implements Listener {
         applyCommandAliases();
 
         LmbCommandExecutor lmbCommandExecutor = new LmbCommandExecutor(this);
+        LmbTabComplete tabCompleter = new LmbTabComplete(this);
         getCommand("lmb").setExecutor(lmbCommandExecutor);
-        getCommand("lmb").setTabCompleter(new LmbTabComplete(this));
+        getCommand("lmb").setTabCompleter(tabCompleter);
 
         getCommand("lmbmigrate").setExecutor(new LmbMigrateCommand(this));
+        getCommand("lmbmigrate").setTabCompleter(tabCompleter);
 
         getCommand("lmbreload").setExecutor((sender, cmd, label, args) -> {
             if (!sender.hasPermission(config.getString("settings.permissions.reload"))) {
@@ -360,7 +362,8 @@ public class LamMailBox extends JavaPlugin implements Listener {
                     .replace("%sender%", sender);
 
             TextComponent message = new TextComponent(colorize(config.getString("messages.prefix") + chatMessage));
-            message.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/lmb view " + mailId));
+            String command = "/" + getPrimaryCommand() + " view " + mailId;
+            message.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command));
             receiver.spigot().sendMessage(message);
         }
 
@@ -464,13 +467,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
                                           StorageSettings.BackendType backendType,
                                           boolean allowImport) {
         if (backendType == StorageSettings.BackendType.SQLITE) {
-            StorageSettings.SqliteSettings sqliteSettings = allowImport
-                    ? settings.sqlite()
-                    : settings.sqlite().withImport(false);
-            if (!sqliteSettings.isEnabled()) {
-                throw new IllegalStateException("SQLite storage is not configured. Set storage.sqlite.file in storage.yml");
-            }
-            return new SqliteMailRepository(this, sqliteSettings);
+            return new SqliteMailRepository(this, settings.sqlitePath());
         }
         return new YamlMailRepository(this);
     }
@@ -484,6 +481,11 @@ public class LamMailBox extends JavaPlugin implements Listener {
         }
         activeBackend = settings.backendType();
         return repository;
+    }
+
+    private String getPrimaryCommand() {
+        List<String> aliases = config.getStringList("settings.command-aliases.base");
+        return aliases.isEmpty() ? "lmb" : aliases.get(0);
     }
 
     private void applyCommandAliases() {

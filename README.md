@@ -8,7 +8,7 @@ LamMailBox lets admins deliver items and rich-text messages to players who donâ€
 * **Rich messages**: Supports colour codes and `\n` line breaks.
 * **Admin tools**: Optional console commands execute when mail is claimed. Schedule or expire mail using `YYYY:MM:DD:HH:mm`.
 * **Bulk targets**: `player1;player2`, `allonline` (current online players), or `all` (remains until everyone claims).
-* **Reliable storage**: YAML-backed with hourly cleanup of expired entries and automatic config migrations via YskLib.
+* **Flexible storage**: Choose between YAML or SQLite backends. SQLite recommended for high-volume servers (1000+ mails).
 * **Notifications**: Chat, title, and sound alerts for new mail and join reminders.
 * **Folia/Paper ready**: Uses bundled FoliaLib scheduler for smooth cross-platform timing.
 
@@ -17,7 +17,7 @@ LamMailBox lets admins deliver items and rich-text messages to players who donâ€
 
 ## Limitations & Roadmap
 
-* Single YAML database (`database.yml`) only; high-volume servers should plan their own archival or cleanup.
+
 * No cross-server syncing or Bungee/Velocity support yet.
 * `allonline` sends only to players online at send time.
 * Mail files are plain text; staff can read or edit them.
@@ -29,12 +29,21 @@ LamMailBox lets admins deliver items and rich-text messages to players who donâ€
 | ------------------------------ | ------------------------ | -------------------------------- |
 | `/lmb`                         | `lammailbox.open`        | Open your mailbox                |
 | `/lmb <player>`                | `lammailbox.open.others` | View another player's mailbox    |
-| `/lmb view <id>`               | `lammailbox.open`        | View mail by ID                  |
+| `/lmb view <id>`               | *(no permission)*        | View mail by ID (if you can access it) |
 | `/lmb as <player>`             | `lammailbox.view.as`     | View mail UI as another player   |
 | `/lmb send <player> <message>` | `lammailbox.admin`       | Send mail via command or console |
 | `/lmbreload`                   | `lammailbox.reload`      | Reload configuration files       |
+| `/lmbmigrate <from> <to>`      | `lammailbox.migrate`     | Migrate mail between storage backends (yaml/sqlite) |
 
-Aliases: `/mailbox`, `/mail`
+**Aliases:** `/mailbox`, `/mail`
+
+## Additional Permissions
+
+| Permission             | Description                                    |
+| ---------------------- | ---------------------------------------------- |
+| `lammailbox.compose`   | Create and send new mail through GUI          |
+| `lammailbox.items`     | Add items to mail when composing              |
+| `lammailbox.delete`    | Delete sent mail from sent mail view          |
 
 ## Setup
 
@@ -45,9 +54,8 @@ Aliases: `/mailbox`, `/mail`
 
 ## Requirements
 
-* Paper or Spigot 1.20+
+* Paper or Folia 1.20+
 * Java 21 runtime
-* Bundled FoliaLib for scheduling
 * [YskLib](https://github.com/YusakiDev/YskLib/releases) 1.6.0 or above
 
 ## Support
