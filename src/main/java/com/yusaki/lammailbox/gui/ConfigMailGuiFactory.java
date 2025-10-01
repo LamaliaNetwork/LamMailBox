@@ -392,14 +392,21 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
         ItemStack createBook = new ItemStack(Material.valueOf(config().getString("gui.main.items.create-mail.material")));
         ItemMeta bookMeta = createBook.getItemMeta();
-        bookMeta.setDisplayName(plugin.colorize(config().getString("gui.main.items.create-mail.name")));
+        String baseName = config().getString("gui.main.items.create-mail.name", "");
+        bookMeta.setDisplayName(plugin.colorize(baseName));
         List<String> bookLore = new ArrayList<>(config().getStringList("gui.main.items.create-mail.lore"));
 
         String viewingAs = plugin.getViewingAsPlayer().get(viewer.getUniqueId());
         if (viewingAs != null && !viewer.getUniqueId().equals(target.getUniqueId())) {
-            bookMeta.setDisplayName(plugin.colorize("&c&l" + config().getString("gui.main.items.create-mail.name")));
-            bookLore.add(plugin.colorize("&c&l⚠ DISABLED"));
-            bookLore.add(plugin.colorize("&7Cannot create mail as another player"));
+            String disabledNameFormat = config().getString("gui.main.items.create-mail.disabled.name-format", "&c&l%name%");
+            bookMeta.setDisplayName(plugin.colorize(disabledNameFormat.replace("%name%", baseName)));
+            List<String> disabledLore = config().getStringList("gui.main.items.create-mail.disabled.lore");
+            if (!disabledLore.isEmpty()) {
+                bookLore.addAll(disabledLore);
+            } else {
+                bookLore.add("&c&l⚠ DISABLED");
+                bookLore.add("&7Cannot create mail as another player");
+            }
         }
 
         bookMeta.setLore(bookLore.stream().map(plugin::colorize).collect(Collectors.toList()));

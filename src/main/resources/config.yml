@@ -51,6 +51,11 @@ gui:
         lore:
           - '&7ᴄʟɪᴄᴋ ᴛᴏ ᴄᴏᴍᴘᴏsᴇ'
         slot: 44
+        disabled:
+          name-format: '&c&l%name%'
+          lore:
+            - '&c&l⚠ DISABLED'
+            - '&7Cannot create mail as another player'
       sent-mail:
         enabled: true
         material: BOOKSHELF
@@ -299,6 +304,7 @@ messages:
   enter-receiver: '&e✎ Who would you like to send this mail to?'
   enter-message: '&e✎ Write your message below:'
   mail-sent: '&a✔ Mail delivered successfully!'
+  mail-sent-console: '&aMail sent successfully.'
   invalid-receiver: '&c✖ Player not found. Please check the name and try again.'
   new-mail: '&a✉ You have received new mail! Check your mailbox.'
   no-permission: '&c✖ You do not have permission for this action.'
@@ -312,6 +318,10 @@ messages:
   current-message: '&a✎ Your message:'
   items-added: '&a✔ Added %amount% items to mail'
   console-only: '&c✖ This command can only be used by players!'
+  usage-send: '&cUsage: /lmb send <users> <message> | [commands] | schedule:YYYY:MM:DD:HH:mm | expire:YYYY:MM:DD:HH:mm'
+  usage-view: '&cUsage: /lmb view <mailId>'
+  usage-as: '&cUsage: /lmb as <player>'
+  usage-default: '&cUsage: /lmb <player>'
   new-mail-clickable: '&a[📬 Click to View] &fNew mail from &e%sender%'
   mail-not-found: '&c✖ This mail no longer exists.'
   mail-no-access: '&c✖ You cannot access this mail.'
@@ -329,6 +339,9 @@ messages:
   viewing-as-player: '&7Viewing mailbox as %player%'
   send-command-admin-only: '&cOnly admins can use the send command. Use the GUI to send mail.'
   cannot-create-as-other: '&cYou cannot create mail as another player. Use your own mailbox to send mail.'
+  mailbox-opened-as: '&aOpened mailbox as %player%'
+  console-gui-warning: '&cConsole cannot open GUI. Use /lmb <player> instead.'
+  mailbox-opened-for: '&aOpened mailbox for %player%'
   migrate-usage: '&cUsage: /lmbmigrate <source> <target>'
   migrate-invalid: '&c✖ Unknown storage type: %type%'
   migrate-same: '&c✖ Source and target storage must be different.'
@@ -337,6 +350,7 @@ messages:
   migrate-empty: '&eNo mail entries found in %source% storage.'
   migrate-success: '&a✔ Migration complete: %count% mails moved to %target%.'
   migrate-error: '&c✖ Migration failed: %error%'
+  never-expire: '&7Never'
 
 
 titles:
