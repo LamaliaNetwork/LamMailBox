@@ -22,6 +22,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import com.yusaki.lammailbox.command.LmbCommandExecutor;
 import com.yusaki.lammailbox.command.LmbMigrateCommand;
@@ -30,6 +31,12 @@ import com.yusaki.lammailbox.config.StorageSettings;
 import com.yusaki.lammailbox.gui.ConfigMailGuiFactory;
 import com.yusaki.lammailbox.gui.InventoryClickHandler;
 import com.yusaki.lammailbox.gui.MailGuiFactory;
+import com.yusaki.lammailbox.mailing.MailingConfigLoader;
+import com.yusaki.lammailbox.mailing.MailingDefinition;
+import com.yusaki.lammailbox.mailing.MailingScheduler;
+import com.yusaki.lammailbox.mailing.status.MailingStatusRepository;
+import com.yusaki.lammailbox.mailing.status.SqliteMailingStatusRepository;
+import com.yusaki.lammailbox.mailing.status.YamlMailingStatusRepository;
 import com.yusaki.lammailbox.repository.MailRepository;
 import com.yusaki.lammailbox.repository.SqliteMailRepository;
 import com.yusaki.lammailbox.repository.YamlMailRepository;
@@ -55,6 +62,11 @@ public class LamMailBox extends JavaPlugin implements Listener {
     private MailGuiFactory mailGuiFactory;
     private MailCreationController mailCreationController;
     private MailBoxConfigUpdater configUpdater;
+    private MailingConfigLoader mailingConfigLoader;
+    private MailingStatusRepository mailingStatusRepository;
+    private MailingScheduler mailingScheduler;
+    private List<MailingDefinition> mailingDefinitions;
+    private boolean mailingAutoCleanup;
 
     @Override
     public void onEnable() {
@@ -79,6 +91,15 @@ public class LamMailBox extends JavaPlugin implements Listener {
         mailCreationController = new MailCreationController(this);
         applyCommandAliases();
 
+        mailingConfigLoader = new MailingConfigLoader(this);
+        mailingConfigLoader.saveDefaultIfMissing();
+        mailingStatusRepository = createMailingStatusRepository(storageSettings);
+        mailingDefinitions = mailingConfigLoader.load();
+        mailingAutoCleanup = getConfig().getBoolean("mailings.auto-cleanup", true);
+        performMailingCleanup();
+        mailingScheduler = new MailingScheduler(this, mailService, mailingStatusRepository, foliaLib);
+        mailingScheduler.start(mailingDefinitions);
+
         LmbCommandExecutor lmbCommandExecutor = new LmbCommandExecutor(this);
         LmbTabComplete tabCompleter = new LmbTabComplete(this);
         getCommand("lmb").setExecutor(lmbCommandExecutor);
@@ -97,8 +118,36 @@ public class LamMailBox extends JavaPlugin implements Listener {
             configUpdater.updateConfigs();
             reloadConfig();
             config = getConfig();
+            mailingAutoCleanup = config.getBoolean("mailings.auto-cleanup", true);
             applyCommandAliases();
+            reloadMailings();
             sender.sendMessage(colorize(config.getString("messages.reload-success")));
+
+            List<MailingDefinition> definitions = getMailingDefinitions();
+            if (!definitions.isEmpty()) {
+                long activeCount = definitions.stream().filter(MailingDefinition::enabled).count();
+                String summary = config.getString("messages.prefix") + "&7Mailings active: &a" + activeCount + "&7/&f" + definitions.size();
+                sender.sendMessage(colorize(summary));
+
+                if (activeCount > 0) {
+                    int previewLimit = 5;
+                    List<String> activeIds = definitions.stream()
+                            .filter(MailingDefinition::enabled)
+                            .map(MailingDefinition::id)
+                            .collect(Collectors.toList());
+                    List<String> preview = activeIds.size() > previewLimit
+                            ? activeIds.subList(0, previewLimit)
+                            : activeIds;
+                    String idsLine = String.join("&f, ", preview);
+                    String detail = config.getString("messages.prefix") + "&7Active IDs: &f" + idsLine;
+                    if (activeIds.size() > previewLimit) {
+                        detail += " &7(+" + (activeIds.size() - previewLimit) + " more)";
+                    }
+                    sender.sendMessage(colorize(detail));
+                }
+            } else {
+                sender.sendMessage(colorize(config.getString("messages.prefix") + "&7No mailings configured."));
+            }
             return true;
         });
 
@@ -114,6 +163,12 @@ public class LamMailBox extends JavaPlugin implements Listener {
     public void onDisable() {
         if (mailRepository != null) {
             mailRepository.shutdown();
+        }
+        if (mailingScheduler != null) {
+            mailingScheduler.shutdown();
+        }
+        if (mailingStatusRepository != null) {
+            mailingStatusRepository.shutdown();
         }
     }
 
@@ -219,6 +274,9 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
         Player player = event.getPlayer();
         checkPlayerMails(player);
+        if (mailingScheduler != null) {
+            mailingScheduler.handlePlayerJoin(player);
+        }
     }
 
 
@@ -483,9 +541,31 @@ public class LamMailBox extends JavaPlugin implements Listener {
         return repository;
     }
 
-    private String getPrimaryCommand() {
-        List<String> aliases = config.getStringList("settings.command-aliases.base");
-        return aliases.isEmpty() ? "lmb" : aliases.get(0);
+    private MailingStatusRepository createMailingStatusRepository(StorageSettings settings) {
+        if (settings.backendType() == StorageSettings.BackendType.SQLITE) {
+            return new SqliteMailingStatusRepository(this, settings.sqlitePath());
+        }
+        return new YamlMailingStatusRepository(this);
+    }
+
+    public void reloadMailings() {
+        mailingConfigLoader.saveDefaultIfMissing();
+        mailingDefinitions = mailingConfigLoader.load();
+        performMailingCleanup();
+        if (mailingScheduler != null) {
+            mailingScheduler.updateDefinitions(mailingDefinitions);
+        }
+    }
+
+    private void performMailingCleanup() {
+        if (!mailingAutoCleanup || mailingStatusRepository == null || mailingDefinitions == null) {
+            return;
+        }
+        Set<String> activeIds = mailingDefinitions.stream()
+                .map(MailingDefinition::id)
+                .collect(Collectors.toSet());
+        mailingStatusRepository.purgeMissingMailings(activeIds);
+        getLogger().info("Mailing status cleanup executed for IDs: " + activeIds);
     }
 
     private void applyCommandAliases() {
@@ -537,5 +617,25 @@ public class LamMailBox extends JavaPlugin implements Listener {
         } catch (ReflectiveOperationException ignored) {
         }
         return null;
+    }
+
+    private String getPrimaryCommand() {
+        List<String> aliases = config.getStringList("settings.command-aliases.base");
+        return aliases.isEmpty() ? "lmb" : aliases.get(0);
+    }
+
+    public List<MailingDefinition> getMailingDefinitions() {
+        if (mailingDefinitions == null) {
+            return Collections.emptyList();
+        }
+        return Collections.unmodifiableList(new ArrayList<>(mailingDefinitions));
+    }
+
+    public MailingStatusRepository getMailingStatusRepository() {
+        return mailingStatusRepository;
+    }
+
+    public MailingScheduler getMailingScheduler() {
+        return mailingScheduler;
     }
 }
