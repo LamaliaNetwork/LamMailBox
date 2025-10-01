@@ -39,6 +39,7 @@ public class LmbTabComplete implements TabCompleter {
             List<String> completions = new ArrayList<>();
             if (sender.hasPermission(config.getString("settings.admin-permission"))) {
                 completions.add("send");
+                completions.add("mailings");
             }
             if (sender.hasPermission(config.getString("settings.permissions.open"))) {
                 completions.add("view");

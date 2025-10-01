@@ -1,6 +1,8 @@
 package com.yusaki.lammailbox.command;
 
 import com.yusaki.lammailbox.LamMailBox;
+import com.yusaki.lammailbox.mailing.MailingDefinition;
+import com.yusaki.lammailbox.mailing.MailingType;
 import com.yusaki.lammailbox.repository.MailRecord;
 import com.yusaki.lammailbox.service.MailDelivery;
 import com.yusaki.lammailbox.session.MailCreationSession;
@@ -11,10 +13,16 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 public class LmbCommandExecutor implements CommandExecutor {
     private final LamMailBox plugin;
+    private static final DateTimeFormatter DATE_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                    .withZone(ZoneId.systemDefault());
 
     public LmbCommandExecutor(LamMailBox plugin) {
         this.plugin = plugin;
@@ -34,6 +42,8 @@ public class LmbCommandExecutor implements CommandExecutor {
                 return handleView(sender, args);
             case "as":
                 return handleAs(sender, args);
+            case "mailings":
+                return handleMailings(sender);
             default:
                 return handleOpenOther(sender, rawSubCommand);
         }
@@ -267,6 +277,62 @@ public class LmbCommandExecutor implements CommandExecutor {
         Player player = (Player) sender;
         plugin.openMainGUI(player);
         return true;
+    }
+
+    private boolean handleMailings(CommandSender sender) {
+        FileConfiguration config = plugin.getConfig();
+        if (!sender.hasPermission(config.getString("settings.admin-permission"))) {
+            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
+                    config.getString("messages.no-permission")));
+            return true;
+        }
+
+        List<MailingDefinition> definitions = plugin.getMailingDefinitions();
+        if (definitions.isEmpty()) {
+            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
+                    "&7No mailings configured."));
+            return true;
+        }
+
+        sender.sendMessage(plugin.colorize(config.getString("messages.prefix") + "&6Mailings:"));
+        long now = System.currentTimeMillis();
+        var statusRepository = plugin.getMailingStatusRepository();
+        var scheduler = plugin.getMailingScheduler();
+        for (MailingDefinition definition : definitions) {
+            StringBuilder line = new StringBuilder();
+            line.append("&e").append(definition.id()).append(" &7[")
+                    .append(definition.type()).append("] ")
+                    .append(definition.enabled() ? "&aENABLED" : "&cDISABLED");
+
+            switch (definition.type()) {
+                case REPEATING -> {
+                    if (definition.cronExpression() != null) {
+                        line.append(" &7cron=\"&f").append(definition.cronExpression()).append("&7\"");
+                    }
+                    long lastRun = statusRepository != null ? statusRepository.getLastRun(definition.id()) : 0L;
+                    if (lastRun > 0) {
+                        line.append(" &7last: &f").append(formatTime(lastRun));
+                    }
+                    OptionalLong nextRun = scheduler != null ? scheduler.previewNextRunEpoch(definition.id()) : OptionalLong.empty();
+                    nextRun.ifPresent(value -> line.append(" &7next: &f").append(formatTime(value)));
+                    if (definition.maxRuns() != null) {
+                        int runCount = statusRepository != null ? statusRepository.getRunCount(definition.id()) : 0;
+                        line.append(" &7runs: &f").append(runCount).append("/&f").append(definition.maxRuns());
+                        if (runCount >= definition.maxRuns()) {
+                            line.append(" &7(status: &acompleted&7)");
+                        }
+                    }
+                }
+                case FIRST_JOIN -> line.append(" &7-> &fOn first join");
+            }
+
+            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") + line));
+        }
+        return true;
+    }
+
+    private String formatTime(long timestamp) {
+        return DATE_FORMATTER.format(Instant.ofEpochMilli(timestamp));
     }
 
     /**
