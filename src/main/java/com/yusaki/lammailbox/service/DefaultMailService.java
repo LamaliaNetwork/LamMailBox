@@ -169,11 +169,11 @@ public class DefaultMailService implements MailService {
 
         if (session.getCommandBlock() != null) {
             data.put("command-block", ItemSerialization.serializeItem(session.getCommandBlock()));
-            data.put("commands", new ArrayList<>(session.getCommands()));
         } else {
             data.put("command-block", null);
-            data.put("commands", new ArrayList<String>());
         }
+        List<String> commands = session.getCommands() != null ? new ArrayList<>(session.getCommands()) : new ArrayList<>();
+        data.put("commands", commands);
 
         repository.saveMail(mailId, data);
         repository.saveMailItems(mailId, items);
