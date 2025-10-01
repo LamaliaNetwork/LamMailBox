@@ -6,7 +6,7 @@
 
     <groupId>com.yusaki</groupId>
     <artifactId>LamMailBox</artifactId>
-    <version>1.4.1-SNAPSHOT</version>
+    <version>1.4.2-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>LamMailBox</name>
@@ -45,6 +45,10 @@
                         <relocation>
                             <pattern>com.tcoded.folialib</pattern>
                             <shadedPattern>com.yusaki.lammailbox.lib.folialib</shadedPattern>
+                        </relocation>
+                        <relocation>
+                            <pattern>com.cronutils</pattern>
+                            <shadedPattern>com.yusaki.lammailbox.lib.cronutils</shadedPattern>
                         </relocation>
                     </relocations>
                 </configuration>
@@ -116,6 +120,11 @@
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
             <version>3.45.3.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.cronutils</groupId>
+            <artifactId>cron-utils</artifactId>
+            <version>9.2.0</version>
         </dependency>
     </dependencies>
 </project>
