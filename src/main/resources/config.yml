@@ -25,6 +25,9 @@ settings:
   command-aliases:
     base: [mailbox, mail, mb]
 
+mailings:
+  auto-cleanup: true
+
 gui:
   main:
     title: '&8ᴍᴀɪʟʙᴏx'
