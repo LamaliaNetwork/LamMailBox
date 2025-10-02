@@ -28,13 +28,15 @@ public class DefaultMailService implements MailService {
     public MailDelivery sendMail(Player sender, MailCreationSession session) {
         validateSession(session);
         boolean isAdminMail = sender.hasPermission(config().getString("settings.admin-permission"));
-        return persistMail(sender.getName(), session, isAdminMail, session.getItems());
+        List<ItemStack> items = session.getItems() != null ? session.getItems() : Collections.emptyList();
+        return persistMail(sender.getName(), session, isAdminMail, items);
     }
 
     @Override
     public MailDelivery sendConsoleMail(CommandSender sender, MailCreationSession session) {
         validateSession(session);
-        return persistMail(sender.getName(), session, true, Collections.emptyList());
+        List<ItemStack> items = session.getItems() != null ? session.getItems() : Collections.emptyList();
+        return persistMail(sender.getName(), session, true, items);
     }
 
     @Override
@@ -169,11 +171,11 @@ public class DefaultMailService implements MailService {
 
         if (session.getCommandBlock() != null) {
             data.put("command-block", ItemSerialization.serializeItem(session.getCommandBlock()));
-            data.put("commands", new ArrayList<>(session.getCommands()));
         } else {
             data.put("command-block", null);
-            data.put("commands", new ArrayList<String>());
         }
+        List<String> commands = session.getCommands() != null ? new ArrayList<>(session.getCommands()) : new ArrayList<>();
+        data.put("commands", commands);
 
         repository.saveMail(mailId, data);
         repository.saveMailItems(mailId, items);

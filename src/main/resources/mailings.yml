@@ -1,0 +1,64 @@
+mailings:
+  # === COMMON FIELDS ===
+  # enabled: true/false toggle for the mailing.
+  # type: FIRST_JOIN | REPEATING
+  #   FIRST_JOIN  -> fires when a player joins for the first time (per UUID).
+  #   REPEATING   -> follows the cron schedule defined under schedule.cron.
+  # message: The text stored in the mail body (supports color codes like &a).
+  # sender: Name shown as the mail sender (defaults to "Console" if omitted).
+  # receiver: Target spec (player name, semicolon list, "all", etc.). Defaults to "all".
+  # required-permission: Optional permission node players must have to receive the mail.
+  # expire-days: Optional integer; how many days until the mail auto-expires (null = config default).
+  # items: List of item directives converted directly into ItemStacks (supports namespace ids).
+  # commands: Console commands executed when the mail is claimed (supports %player% placeholder).
+  # schedule:
+  #   For FIRST_JOIN:
+  #     delay-minutes / delay-seconds (optional) -> wait before delivering after first join.
+  #   For CRON:
+  #     cron: UNIX cron expression "m h dom mon dow" (required).
+  #     max-runs: Optional positive integer to limit total executions (1 = run once).
+
+  # --- Example 1: New player welcome mail ---
+  welcome-new-players:
+    enabled: false
+    type: FIRST_JOIN
+    message: "&aWelcome to the server!"
+    sender: "Server"
+    expire-days: 7
+    items:
+      - "minecraft:cookie 16"  # Give 16 cookies when claiming the mail.
+    commands:
+      - "title %player% subtitle {\"text\":\"Check /mailbox for a welcome gift!\",\"color\":\"gold\"}"
+    schedule:
+      delay-seconds: 10        # Wait 10 seconds after first join before sending.
+
+  # --- Example 2: Daily reward for everyone at 18:00 server time ---
+  daily-reward:
+    enabled: false
+    type: REPEATING
+    receiver: "all"
+    message: "&eYour daily reward is waiting!"
+    sender: "Server"
+    expire-days: 3
+    items:
+      - "minecraft:diamond 1"
+    commands: []
+    schedule:
+      cron: "0 18 * * *"       # Minute Hour DOM Month DOW -> 18:00 every day.
+      # max-runs omitted -> repeats forever.
+
+  # --- Example 3: Single launch announcement, runs once on Jan 1 at 12:00 ---
+  launch-announcement:
+    enabled: false
+    type: REPEATING
+    receiver: "all"
+    message: "&6Server launch celebration!"
+    sender: "Server"
+    expire-days: 14
+    items:
+      - "minecraft:emerald 3"
+    commands:
+      - "broadcast Server is live!"
+    schedule:
+      cron: "0 12 1 1 *"       # Noon on January 1.
+      max-runs: 1              # Limit to a single execution.

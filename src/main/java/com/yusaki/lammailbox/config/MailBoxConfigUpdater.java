@@ -63,7 +63,7 @@ public class MailBoxConfigUpdater {
     }
 
     // Config version - tracks configuration schema changes
-    private static final double CURRENT_CONFIG_VERSION = 1.0;
+    private static final double CURRENT_CONFIG_VERSION = 1.3;
 
     /**
      * Creates migrations for different config versions.

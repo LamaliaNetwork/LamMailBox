@@ -39,9 +39,7 @@ public class LmbTabComplete implements TabCompleter {
             List<String> completions = new ArrayList<>();
             if (sender.hasPermission(config.getString("settings.admin-permission"))) {
                 completions.add("send");
-            }
-            if (sender.hasPermission(config.getString("settings.permissions.open"))) {
-                completions.add("view");
+                completions.add("mailings");
             }
             if (sender.hasPermission(config.getString("settings.permissions.view-as"))) {
                 completions.add("as");
@@ -75,13 +73,6 @@ public class LmbTabComplete implements TabCompleter {
                         playerNames.add("allonline");
                     }
                     return playerNames;
-                }
-            } else if (Objects.equals(subCommand, "view")) {
-                if (sender instanceof Player && sender.hasPermission(config.getString("settings.permissions.open"))) {
-                    return plugin.getMailRepository().listMailIds().stream()
-                            .filter(mailId -> mailId.toLowerCase().startsWith(current))
-                            .limit(10)
-                            .collect(Collectors.toList());
                 }
             } else {
                 if (sender.hasPermission(config.getString("settings.permissions.open-others"))) {

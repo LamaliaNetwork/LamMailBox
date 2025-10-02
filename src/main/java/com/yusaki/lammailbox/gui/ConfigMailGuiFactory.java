@@ -25,9 +25,274 @@ import java.util.stream.Collectors;
  */
 public class ConfigMailGuiFactory implements MailGuiFactory {
     private final LamMailBox plugin;
+    private final NamespacedKey decorationKey;
 
     public ConfigMailGuiFactory(LamMailBox plugin) {
         this.plugin = plugin;
+        this.decorationKey = new NamespacedKey(plugin, "decorationPath");
+    }
+
+    private ItemStack styledCommandIcon(String basePath, ItemStack existing, int commandCount, String summary) {
+        ItemStack stack = existing != null ? existing.clone() : null;
+
+        String materialName = config().getString(basePath + ".material");
+        if (materialName != null && !materialName.isBlank()) {
+            try {
+                Material material = Material.valueOf(materialName.trim().toUpperCase(Locale.ROOT));
+                if (stack == null || stack.getType() != material) {
+                    stack = new ItemStack(material);
+                }
+            } catch (IllegalArgumentException ignored) {
+                if (stack == null) {
+                    stack = new ItemStack(Material.COMMAND_BLOCK);
+                }
+            }
+        } else if (stack == null) {
+            stack = new ItemStack(Material.COMMAND_BLOCK);
+        }
+
+        if (stack == null) {
+            stack = new ItemStack(Material.COMMAND_BLOCK);
+        }
+
+        ItemMeta meta = stack.getItemMeta();
+        if (meta != null) {
+            String displayName = config().getString(basePath + ".name");
+            if (displayName != null && !displayName.isBlank()) {
+                meta.setDisplayName(plugin.colorize(displayName
+                        .replace("%count%", String.valueOf(commandCount))
+                        .replace("%summary%", summary)));
+            }
+
+            List<String> rawLore = config().getStringList(basePath + ".lore");
+            if (rawLore == null || rawLore.isEmpty()) {
+                rawLore = Collections.singletonList("&7Contains hidden console actions");
+            }
+            List<String> lore = rawLore.stream()
+                    .map(line -> plugin.colorize(line
+                            .replace("%count%", String.valueOf(commandCount))
+                            .replace("%summary%", summary)))
+                    .collect(Collectors.toList());
+            meta.setLore(lore);
+            stack.setItemMeta(meta);
+        }
+        return stack;
+    }
+
+    private void placeItemsAndCommands(Inventory inv,
+                                       List<ItemStack> items,
+                                       List<String> commands,
+                                       String itemPath,
+                                       String commandPath,
+                                       int currentPage,
+                                       int slotsPerPage) {
+        List<Integer> itemSlots = config().getIntegerList(itemPath + ".slots");
+        if (itemSlots == null || itemSlots.isEmpty()) {
+            return;
+        }
+
+        // Combine items and commands into a single list for pagination
+        List<Object> allElements = new ArrayList<>();
+        allElements.addAll(items != null ? items : Collections.emptyList());
+        if (commands != null && !commands.isEmpty() && isEnabled(commandPath)) {
+            allElements.addAll(commands);
+        }
+
+        // Calculate start and end indices for current page
+        int startIndex = (currentPage - 1) * slotsPerPage;
+        int endIndex = Math.min(startIndex + slotsPerPage, allElements.size());
+
+        // Place elements for current page
+        int slotIndex = 0;
+        for (int i = startIndex; i < endIndex && slotIndex < itemSlots.size(); i++) {
+            Object element = allElements.get(i);
+
+            if (element instanceof ItemStack) {
+                // Place actual item
+                inv.setItem(itemSlots.get(slotIndex++), (ItemStack) element);
+            } else if (element instanceof String) {
+                // Place command placeholder
+                String command = (String) element;
+                ItemStack commandIcon = createCommandPlaceholder(commandPath, command);
+                inv.setItem(itemSlots.get(slotIndex++), commandIcon);
+            }
+        }
+    }
+
+    private ItemStack createCommandPlaceholder(String commandPath, String command) {
+        Material material = Material.COMMAND_BLOCK;
+        String materialName = config().getString(commandPath + ".material");
+        if (materialName != null) {
+            Material configMaterial = Material.matchMaterial(materialName);
+            if (configMaterial != null) {
+                material = configMaterial;
+            }
+        }
+
+        ItemStack commandIcon = new ItemStack(material);
+        ItemMeta meta = commandIcon.getItemMeta();
+        if (meta != null) {
+            String name = config().getString(commandPath + ".name", "&6Command");
+            meta.setDisplayName(plugin.colorize(name));
+
+            List<String> lore = config().getStringList(commandPath + ".lore");
+            if (!lore.isEmpty()) {
+                meta.setLore(lore.stream()
+                        .map(plugin::colorize)
+                        .collect(Collectors.toList()));
+            }
+            commandIcon.setItemMeta(meta);
+        }
+        return commandIcon;
+    }
+
+    private void addPaginationButtons(Inventory inv,
+                                      String mailId,
+                                      int currentPage,
+                                      int totalPages,
+                                      Integer claimSlot,
+                                      Integer dismissSlot) {
+        if (totalPages <= 1) {
+            // No pagination needed
+            return;
+        }
+
+        String basePath = "gui.mail-view.items.pagination";
+
+        Set<Integer> reservedSlots = new HashSet<>();
+        if (claimSlot != null) {
+            reservedSlots.add(claimSlot);
+        }
+        if (dismissSlot != null) {
+            reservedSlots.add(dismissSlot);
+        }
+
+        // Previous button
+        if (isEnabled(basePath + ".previous-button") && currentPage > 1) {
+            int preferred = config().getInt(basePath + ".previous-button.slot", 36);
+            String materialName = config().getString(basePath + ".previous-button.material", "ARROW");
+            Material material = Material.matchMaterial(materialName);
+            if (material != null) {
+                ItemStack prevButton = new ItemStack(material);
+                ItemMeta meta = prevButton.getItemMeta();
+                if (meta != null) {
+                    String name = config().getString(basePath + ".previous-button.name", "&e← Previous");
+                    meta.setDisplayName(plugin.colorize(name));
+                    meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "mailId"),
+                            PersistentDataType.STRING, mailId);
+                    meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "action"),
+                            PersistentDataType.STRING, "page-prev");
+                    prevButton.setItemMeta(meta);
+                    Integer targetSlot = findAvailableSlot(inv, preferred, reservedSlots);
+                    if (targetSlot != null) {
+                        inv.setItem(targetSlot, prevButton);
+                    }
+                }
+            }
+        }
+
+        // Next button
+        if (isEnabled(basePath + ".next-button") && currentPage < totalPages) {
+            int preferred = config().getInt(basePath + ".next-button.slot", 44);
+            String materialName = config().getString(basePath + ".next-button.material", "ARROW");
+            Material material = Material.matchMaterial(materialName);
+            if (material != null) {
+                ItemStack nextButton = new ItemStack(material);
+                ItemMeta meta = nextButton.getItemMeta();
+                if (meta != null) {
+                    String name = config().getString(basePath + ".next-button.name", "&eNext →");
+                    meta.setDisplayName(plugin.colorize(name));
+                    meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "mailId"),
+                            PersistentDataType.STRING, mailId);
+                    meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "action"),
+                            PersistentDataType.STRING, "page-next");
+                    nextButton.setItemMeta(meta);
+                    Integer targetSlot = findAvailableSlot(inv, preferred, reservedSlots);
+                    if (targetSlot != null) {
+                        inv.setItem(targetSlot, nextButton);
+                    }
+                }
+            }
+        }
+
+        // Page indicator
+        if (isEnabled(basePath + ".page-indicator")) {
+            int preferred = config().getInt(basePath + ".page-indicator.slot", 40);
+            String materialName = config().getString(basePath + ".page-indicator.material", "BOOK");
+            Material material = Material.matchMaterial(materialName);
+            if (material != null) {
+                ItemStack indicator = new ItemStack(material);
+                ItemMeta meta = indicator.getItemMeta();
+                if (meta != null) {
+                    String name = config().getString(basePath + ".page-indicator.name", "&6Page %current%/%total%");
+                    name = name.replace("%current%", String.valueOf(currentPage))
+                            .replace("%total%", String.valueOf(totalPages));
+                    meta.setDisplayName(plugin.colorize(name));
+                    indicator.setItemMeta(meta);
+                    Integer targetSlot = findAvailableSlot(inv, preferred, reservedSlots);
+                    if (targetSlot != null) {
+                        inv.setItem(targetSlot, indicator);
+                    }
+                }
+            }
+        }
+    }
+
+    private Integer findAvailableSlot(Inventory inv,
+                                      int preferred,
+                                      Set<Integer> reservedSlots) {
+        int inventorySize = inv.getSize();
+        int[] offsets = {0, -1, 1, -2, 2, -3, 3, -4, 4};
+        for (int offset : offsets) {
+            int candidate = preferred + offset;
+            if (candidate < 0 || candidate >= inventorySize) {
+                continue;
+            }
+            if (reservedSlots.contains(candidate)) {
+                continue;
+            }
+            ItemStack existing = inv.getItem(candidate);
+            if (existing != null) {
+                ItemMeta meta = existing.getItemMeta();
+                if (meta == null || !meta.getPersistentDataContainer().has(decorationKey, PersistentDataType.STRING)) {
+                    continue;
+                }
+            }
+            return candidate;
+        }
+        plugin.getLogger().warning("Unable to place pagination control; no free slot near " + preferred);
+        return null;
+    }
+
+    private String summarizeCommand(String command) {
+        if (command == null || command.isBlank()) {
+            return "Console";
+        }
+
+        String trimmed = command.trim();
+        if (trimmed.startsWith("/")) {
+            trimmed = trimmed.substring(1);
+        }
+
+        String[] parts = trimmed.split("\\s+");
+        if (parts.length >= 3 && parts[0].equalsIgnoreCase("give")) {
+            String item = parts[2].replace("%player%", "@p");
+            int amount = 1;
+            if (parts.length >= 4) {
+                try {
+                    amount = Integer.parseInt(parts[3]);
+                } catch (NumberFormatException ignored) {
+                    amount = 1;
+                }
+            }
+            return item + "/" + amount;
+        }
+
+        String main = parts[0];
+        if (parts.length > 1) {
+            return main + " " + parts[1].replace("%player%", "@p");
+        }
+        return main;
     }
 
     @Override
@@ -112,25 +377,15 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
 
         List<ItemStack> items = plugin.getMailRepository().loadMailItems(mailId);
-        if (isEnabled("gui.sent-mail-view.items.items-display")) {
-            List<Integer> itemSlots = config().getIntegerList("gui.sent-mail-view.items.items-display.slots");
-            for (int i = 0; i < Math.min(items.size(), itemSlots.size()); i++) {
-                inv.setItem(itemSlots.get(i), items.get(i));
-            }
-        }
-
-        List<String> commands = record.commands();
-        if (!commands.isEmpty() && isEnabled("gui.sent-mail-view.items.command-block")) {
-            String serialized = record.commandBlock();
-            ItemStack commandBlock = serialized != null ? ItemSerialization.deserializeItem(serialized)
-                    : createDefaultCommandBlock();
-            if (commandBlock != null) {
-                ItemMeta commandMeta = commandBlock.getItemMeta();
-                commandMeta.setLore(new ArrayList<>());
-                commandBlock.setItemMeta(commandMeta);
-                inv.setItem(config().getInt("gui.sent-mail-view.items.command-block.slot"), commandBlock);
-            }
-        }
+        List<Integer> itemSlots = config().getIntegerList("gui.sent-mail-view.items.items-display.slots");
+        int slotsPerPage = itemSlots != null && !itemSlots.isEmpty() ? itemSlots.size() : 21;
+        placeItemsAndCommands(inv,
+                items,
+                record.commands(),
+                "gui.sent-mail-view.items.items-display",
+                "gui.sent-mail-view.items.command-item",
+                1,
+                slotsPerPage);
 
         if (viewer.hasPermission(config().getString("settings.permissions.delete"))
                 && isEnabled("gui.sent-mail-view.items.delete-button")) {
@@ -191,34 +446,39 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
 
         List<ItemStack> items = plugin.getMailRepository().loadMailItems(mailId);
-        if (isEnabled("gui.mail-view.items.items-display")) {
-            List<Integer> itemSlots = config().getIntegerList("gui.mail-view.items.items-display.slots");
-            for (int i = 0; i < Math.min(items.size(), itemSlots.size()); i++) {
-                inv.setItem(itemSlots.get(i), items.get(i));
-            }
-        }
 
-        List<String> commands = record.commands();
-        if (!commands.isEmpty() && isEnabled("gui.mail-view.items.command-block")) {
-            String serialized = record.commandBlock();
-            ItemStack commandBlock = serialized != null ? ItemSerialization.deserializeItem(serialized)
-                    : new ItemStack(Material.COMMAND_BLOCK);
-            if (commandBlock != null) {
-                ItemMeta commandMeta = commandBlock.getItemMeta();
-                List<String> lore = new ArrayList<>();
-                lore.add(plugin.colorize(config().getString("messages.command-prefix")));
-                for (String command : commands) {
-                    lore.add(plugin.colorize(config().getString("messages.command-format-display")
-                            .replace("%command%", command)));
-                }
-                commandMeta.setLore(lore);
-                commandBlock.setItemMeta(commandMeta);
-                inv.setItem(config().getInt("gui.mail-view.items.command-block.slot"), commandBlock);
-            }
-        }
+        // Get current page for this player (default to 1)
+        int currentPage = plugin.getMailViewPages().getOrDefault(viewer.getUniqueId(), 1);
 
-        int claimSlot = config().getInt("gui.mail-view.items.claim-button.slot");
-        if (isEnabled("gui.mail-view.items.claim-button")) {
+        // Calculate pagination
+        int totalElements = items.size() + (record.commands() != null ? record.commands().size() : 0);
+        List<Integer> itemSlots = config().getIntegerList("gui.mail-view.items.items-display.slots");
+        int slotsPerPage = itemSlots != null && !itemSlots.isEmpty() ? itemSlots.size() : 21;
+        int totalPages = (totalElements + slotsPerPage - 1) / slotsPerPage; // Ceiling division
+
+        // Ensure current page is valid
+        if (currentPage < 1) currentPage = 1;
+        if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+        plugin.getMailViewPages().put(viewer.getUniqueId(), currentPage);
+
+        placeItemsAndCommands(inv,
+                items,
+                record.commands(),
+                "gui.mail-view.items.items-display",
+                "gui.mail-view.items.command-item",
+                currentPage,
+                slotsPerPage);
+
+        int claimSlotConfig = config().getInt("gui.mail-view.items.claim-button.slot");
+        Integer claimSlot = isEnabled("gui.mail-view.items.claim-button") ? claimSlotConfig : null;
+
+        int dismissSlotConfig = config().getInt("gui.mail-view.items.dismiss-button.slot", claimSlotConfig);
+        Integer dismissSlot = isEnabled("gui.mail-view.items.dismiss-button") ? dismissSlotConfig : null;
+
+        // Add pagination buttons
+        addPaginationButtons(inv, mailId, currentPage, totalPages, claimSlot, dismissSlot);
+
+        if (claimSlot != null) {
             ItemStack claimButton = new ItemStack(Material.valueOf(config().getString("gui.mail-view.items.claim-button.material")));
             ItemMeta claimMeta = claimButton.getItemMeta();
             claimMeta.setDisplayName(plugin.colorize(config().getString("gui.mail-view.items.claim-button.name")));
@@ -231,8 +491,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             inv.setItem(claimSlot, claimButton);
         }
 
-        if (isEnabled("gui.mail-view.items.dismiss-button")) {
-            int dismissSlot = config().getInt("gui.mail-view.items.dismiss-button.slot", claimSlot);
+        if (dismissSlot != null) {
             ItemStack dismissButton = new ItemStack(Material.valueOf(config().getString("gui.mail-view.items.dismiss-button.material")));
             ItemMeta dismissMeta = dismissButton.getItemMeta();
             dismissMeta.setDisplayName(plugin.colorize(config().getString("gui.mail-view.items.dismiss-button.name")));
@@ -613,6 +872,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                         .map(plugin::colorize)
                         .collect(Collectors.toList()));
             }
+            // Always mark decorations with the decoration key so they can be replaced by pagination buttons
+            meta.getPersistentDataContainer().set(decorationKey, PersistentDataType.STRING, path);
+
             List<String> commands = config().getStringList(path + ".commands").stream()
                     .filter(line -> line != null && !line.trim().isEmpty())
                     .collect(Collectors.toList());
