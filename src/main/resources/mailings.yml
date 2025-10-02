@@ -11,6 +11,8 @@ mailings:
   # expire-days: Optional integer; how many days until the mail auto-expires (null = config default).
   # items: List of item directives converted directly into ItemStacks (supports namespace ids).
   # commands: Console commands executed when the mail is claimed (supports %player% placeholder).
+  # command-items: Preferred way to define console actions; each entry mirrors the GUI command bundles
+  #                (material, display name, lore, commands) and is shown in the mail view.
   # schedule:
   #   For FIRST_JOIN:
   #     delay-minutes / delay-seconds (optional) -> wait before delivering after first join.
