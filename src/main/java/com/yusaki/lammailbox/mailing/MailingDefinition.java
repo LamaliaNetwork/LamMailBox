@@ -1,10 +1,14 @@
 package com.yusaki.lammailbox.mailing;
 
+import com.yusaki.lammailbox.model.CommandItem;
+
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 public final class MailingDefinition {
     private final String id;
@@ -15,6 +19,7 @@ public final class MailingDefinition {
     private final String sender;
     private final List<String> itemDirectives;
     private final List<String> commands;
+    private final List<CommandItem> commandItems;
     private final String cronExpression;
     private final Integer maxRuns;
     private final Integer expireDays;
@@ -29,7 +34,19 @@ public final class MailingDefinition {
         this.message = builder.message;
         this.sender = builder.sender;
         this.itemDirectives = Collections.unmodifiableList(new ArrayList<>(builder.itemDirectives));
-        this.commands = Collections.unmodifiableList(new ArrayList<>(builder.commands));
+
+        List<CommandItem> builtCommandItems = new ArrayList<>(builder.commandItems);
+        this.commandItems = Collections.unmodifiableList(builtCommandItems);
+
+        List<String> aggregateCommands = new ArrayList<>(builder.commands);
+        if (!builtCommandItems.isEmpty()) {
+            Set<String> ordered = new LinkedHashSet<>(aggregateCommands);
+            for (CommandItem item : builtCommandItems) {
+                ordered.addAll(item.commands());
+            }
+            aggregateCommands = new ArrayList<>(ordered);
+        }
+        this.commands = Collections.unmodifiableList(aggregateCommands);
         this.cronExpression = builder.cronExpression;
         this.maxRuns = builder.maxRuns;
         this.expireDays = builder.expireDays;
@@ -69,6 +86,20 @@ public final class MailingDefinition {
         return commands;
     }
 
+    public List<CommandItem> commandItems() {
+        if (!commandItems.isEmpty()) {
+            return commandItems;
+        }
+        if (commands.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<CommandItem> legacy = new ArrayList<>();
+        for (String command : commands) {
+            legacy.add(CommandItem.legacyFromCommand(command));
+        }
+        return legacy;
+    }
+
     public String cronExpression() {
         return cronExpression;
     }
@@ -102,6 +133,7 @@ public final class MailingDefinition {
         private String sender = "Console";
         private List<String> itemDirectives = new ArrayList<>();
         private List<String> commands = new ArrayList<>();
+        private List<CommandItem> commandItems = new ArrayList<>();
         private String cronExpression;
         private Integer maxRuns;
         private Integer expireDays;
@@ -153,6 +185,13 @@ public final class MailingDefinition {
         public Builder commands(List<String> commands) {
             if (commands != null) {
                 this.commands = new ArrayList<>(commands);
+            }
+            return this;
+        }
+
+        public Builder commandItems(List<CommandItem> commandItems) {
+            if (commandItems != null) {
+                this.commandItems = new ArrayList<>(commandItems);
             }
             return this;
         }

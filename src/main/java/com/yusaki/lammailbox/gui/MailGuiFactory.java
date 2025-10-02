@@ -20,4 +20,8 @@ public interface MailGuiFactory {
     Inventory createMailCreation(Player viewer);
 
     Inventory createItemsEditor(Player viewer);
+
+    Inventory createCommandItemsEditor(Player viewer);
+
+    Inventory createCommandItemCreator(Player viewer);
 }

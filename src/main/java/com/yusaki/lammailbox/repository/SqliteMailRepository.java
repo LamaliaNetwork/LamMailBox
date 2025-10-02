@@ -71,6 +71,17 @@ public class SqliteMailRepository implements MailRepository {
                     "FOREIGN KEY (mail_id) REFERENCES mail(mail_id) ON DELETE CASCADE" +
                     ")");
 
+            statement.executeUpdate("CREATE TABLE IF NOT EXISTS mail_command_items (" +
+                    "mail_id TEXT NOT NULL," +
+                    "ordinal INTEGER NOT NULL," +
+                    "material TEXT," +
+                    "display_name TEXT," +
+                    "lore TEXT," +
+                    "commands TEXT," +
+                    "PRIMARY KEY (mail_id, ordinal)," +
+                    "FOREIGN KEY (mail_id) REFERENCES mail(mail_id) ON DELETE CASCADE" +
+                    ")");
+
             statement.executeUpdate("CREATE TABLE IF NOT EXISTS mail_items (" +
                     "mail_id TEXT NOT NULL," +
                     "ordinal INTEGER NOT NULL," +
@@ -128,6 +139,7 @@ public class SqliteMailRepository implements MailRepository {
                 data.put("command-block", rs.getString("command_block"));
                 data.put("claimed-players", loadClaimedPlayers(connection, mailId));
                 data.put("commands", loadCommands(connection, mailId));
+                data.put("command-items", loadCommandItems(connection, mailId));
                 return data;
             }
         }
@@ -157,6 +169,9 @@ public class SqliteMailRepository implements MailRepository {
                             break;
                         case "commands":
                             replaceCommands(connection, mailId, asStringList(value));
+                            break;
+                        case "command-items":
+                            replaceCommandItems(connection, mailId, asCommandItemMapList(value));
                             break;
                         default:
                             String column = toColumnName(key);
@@ -293,6 +308,35 @@ public class SqliteMailRepository implements MailRepository {
         }
     }
 
+    private void replaceCommandItems(Connection connection,
+                                     String mailId,
+                                     List<Map<String, Object>> commandItems) throws SQLException {
+        try (PreparedStatement delete = connection.prepareStatement("DELETE FROM mail_command_items WHERE mail_id = ?")) {
+            delete.setString(1, mailId);
+            delete.executeUpdate();
+        }
+
+        if (commandItems.isEmpty()) {
+            return;
+        }
+
+        try (PreparedStatement insert = connection.prepareStatement(
+                "INSERT INTO mail_command_items (mail_id, ordinal, material, display_name, lore, commands) " +
+                        "VALUES (?, ?, ?, ?, ?, ?)")) {
+            for (int i = 0; i < commandItems.size(); i++) {
+                Map<String, Object> item = commandItems.get(i);
+                insert.setString(1, mailId);
+                insert.setInt(2, i);
+                insert.setString(3, nullableString(item.get("material")));
+                insert.setString(4, nullableString(item.get("name")));
+                insert.setString(5, joinList(asStringList(item.get("lore"))));
+                insert.setString(6, joinList(asStringList(item.get("commands"))));
+                insert.addBatch();
+            }
+            insert.executeBatch();
+        }
+    }
+
     private List<String> loadClaimedPlayers(Connection connection, String mailId) throws SQLException {
         List<String> players = new ArrayList<>();
         try (PreparedStatement statement = connection.prepareStatement(
@@ -319,6 +363,25 @@ public class SqliteMailRepository implements MailRepository {
             }
         }
         return commands;
+    }
+
+    private List<Map<String, Object>> loadCommandItems(Connection connection, String mailId) throws SQLException {
+        List<Map<String, Object>> items = new ArrayList<>();
+        String sql = "SELECT material, display_name, lore, commands FROM mail_command_items WHERE mail_id = ? ORDER BY ordinal";
+        try (PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, mailId);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put("material", rs.getString("material"));
+                    item.put("name", rs.getString("display_name"));
+                    item.put("lore", splitString(rs.getString("lore")));
+                    item.put("commands", splitString(rs.getString("commands")));
+                    items.add(item);
+                }
+            }
+        }
+        return items;
     }
 
     @Override
@@ -536,6 +599,55 @@ public class SqliteMailRepository implements MailRepository {
             return result;
         }
         return Collections.emptyList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> asCommandItemMapList(Object value) {
+        if (value instanceof List<?>) {
+            List<Map<String, Object>> result = new ArrayList<>();
+            for (Object element : (List<?>) value) {
+                if (element instanceof Map<?, ?> raw) {
+                    Map<String, Object> map = new HashMap<>();
+                    for (Map.Entry<?, ?> entry : raw.entrySet()) {
+                        if (entry.getKey() != null) {
+                            map.put(entry.getKey().toString(), entry.getValue());
+                        }
+                    }
+                    result.add(map);
+                }
+            }
+            return result;
+        }
+        return Collections.emptyList();
+    }
+
+    private static String joinList(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return "";
+        }
+        return String.join("\n", values);
+    }
+
+    private static List<String> splitString(String value) {
+        if (value == null || value.isEmpty()) {
+            return Collections.emptyList();
+        }
+        String[] parts = value.split("\n", -1);
+        List<String> list = new ArrayList<>(parts.length);
+        for (String part : parts) {
+            if (!part.isEmpty()) {
+                list.add(part);
+            }
+        }
+        return list;
+    }
+
+    private static String nullableString(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String str = value.toString();
+        return str.isEmpty() ? null : str;
     }
 
     private static Long getNullableLong(ResultSet rs, String column) throws SQLException {

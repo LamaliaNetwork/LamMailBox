@@ -1,5 +1,11 @@
 package com.yusaki.lammailbox;
 
+import com.cronutils.descriptor.CronDescriptor;
+import com.cronutils.model.Cron;
+import com.cronutils.model.CronType;
+import com.cronutils.model.definition.CronDefinition;
+import com.cronutils.model.definition.CronDefinitionBuilder;
+import com.cronutils.parser.CronParser;
 import com.tcoded.folialib.FoliaLib;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
@@ -68,10 +74,16 @@ public class LamMailBox extends JavaPlugin implements Listener {
     private MailingScheduler mailingScheduler;
     private List<MailingDefinition> mailingDefinitions;
     private boolean mailingAutoCleanup;
+    private CronParser cronParser;
+    private CronDescriptor cronDescriptor;
 
     @Override
     public void onEnable() {
         this.foliaLib = new FoliaLib(this);
+
+        CronDefinition cronDefinition = CronDefinitionBuilder.instanceDefinitionFor(CronType.UNIX);
+        cronParser = new CronParser(cronDefinition);
+        cronDescriptor = CronDescriptor.instance(Locale.getDefault());
 
         // Initialize and run config updater
         this.configUpdater = new MailBoxConfigUpdater(this);
@@ -148,7 +160,8 @@ public class LamMailBox extends JavaPlugin implements Listener {
                     sender.sendMessage(colorize(detail));
                 }
             } else {
-                sender.sendMessage(colorize(config.getString("messages.prefix") + "&7No mailings configured."));
+                String emptyMessage = getMailingsMessage("empty", "&7No mailings configured.");
+                sender.sendMessage(colorize(config.getString("messages.prefix") + emptyMessage));
             }
             return true;
         });
@@ -258,6 +271,26 @@ public class LamMailBox extends JavaPlugin implements Listener {
         player.openInventory(mailGuiFactory.createItemsEditor(player));
     }
 
+    public void openCommandItemsEditor(Player player) {
+        if (!player.hasPermission(config.getString("settings.admin-permission"))) {
+            player.sendMessage(colorize(config.getString("messages.prefix") +
+                    config.getString("messages.no-permission")));
+            return;
+        }
+        inMailCreation.put(player.getUniqueId(), true);
+        player.openInventory(mailGuiFactory.createCommandItemsEditor(player));
+    }
+
+    public void openCommandItemCreator(Player player) {
+        if (!player.hasPermission(config.getString("settings.admin-permission"))) {
+            player.sendMessage(colorize(config.getString("messages.prefix") +
+                    config.getString("messages.no-permission")));
+            return;
+        }
+        inMailCreation.put(player.getUniqueId(), true);
+        player.openInventory(mailGuiFactory.createCommandItemCreator(player));
+    }
+
     private void checkPlayerMails(Player player) {
         String playerName = player.getName();
         for (String mailId : mailRepository.listActiveMailIdsFor(playerName)) {
@@ -311,13 +344,16 @@ public class LamMailBox extends JavaPlugin implements Listener {
         boolean success = true;
         String customSubtitle = null;
         String message = event.getMessage();
+        boolean reopenMailCreation = false;
+        boolean reopenCommandCreator = false;
 
         switch (inputType) {
             case "receiver":
                 success = mailCreationController.handleReceiverInput(player, message, session);
-                customSubtitle = success ?
-                        config.getString("messages.current-receiver").replace("%receiver%", message) :
-                        config.getString("messages.invalid-receiver");
+                customSubtitle = success
+                        ? config.getString("messages.current-receiver").replace("%receiver%", message)
+                        : config.getString("messages.invalid-receiver");
+                reopenMailCreation = true;
                 break;
             case "message":
                 session.setMessage(message.replace("\\n", "\n"));
@@ -332,24 +368,56 @@ public class LamMailBox extends JavaPlugin implements Listener {
                 break;
             case "schedule-date":
                 success = mailCreationController.handleDateInput(player, message, session, true);
-                customSubtitle = success && session.getScheduleDate() != null ?
-                        config.getString("messages.schedule-set")
-                                .replace("%date%", new Date(session.getScheduleDate()).toString()) :
-                        config.getString("messages.invalid-date-format");
+                customSubtitle = success && session.getScheduleDate() != null
+                        ? config.getString("messages.schedule-set")
+                        .replace("%date%", new Date(session.getScheduleDate()).toString())
+                        : config.getString("messages.invalid-date-format");
+                reopenMailCreation = true;
                 break;
             case "expire-date":
                 success = mailCreationController.handleDateInput(player, message, session, false);
-                customSubtitle = success && session.getExpireDate() != null ?
-                        config.getString("messages.expire-set")
-                                .replace("%date%", new Date(session.getExpireDate()).toString()) :
-                        config.getString("messages.invalid-date-format");
+                customSubtitle = success && session.getExpireDate() != null
+                        ? config.getString("messages.expire-set")
+                        .replace("%date%", new Date(session.getExpireDate()).toString())
+                        : config.getString("messages.invalid-date-format");
+                reopenMailCreation = true;
+                break;
+            case "command-item-material":
+                success = mailCreationController.handleCommandItemMaterialInput(player, message, session);
+                customSubtitle = success
+                        ? config.getString("messages.command-item-material-set", "&a✔ Command item material updated.")
+                        : config.getString("messages.invalid-material", "&c✖ Invalid material!");
+                reopenCommandCreator = true;
+                break;
+            case "command-item-name":
+                success = mailCreationController.handleCommandItemNameInput(player, message, session);
+                customSubtitle = success
+                        ? config.getString("messages.command-item-name-set", "&a✔ Display name updated.")
+                        : config.getString("messages.command-item-name-failed", "&c✖ Name update failed.");
+                reopenCommandCreator = true;
+                break;
+            case "command-item-lore":
+                success = mailCreationController.handleCommandItemLoreInput(player, message, session);
+                customSubtitle = success
+                        ? config.getString("messages.command-item-lore-added", "&a✔ Added lore line.")
+                        : config.getString("messages.command-item-lore-failed", "&c✖ Lore update failed");
+                reopenCommandCreator = true;
+                break;
+            case "command-item-command":
+                success = mailCreationController.handleCommandItemCommandInput(player, message, session);
+                customSubtitle = success
+                        ? config.getString("messages.command-item-command-added", "&a✔ Added command.")
+                        : config.getString("messages.command-item-command-failed", "&c✖ Command update failed");
+                reopenCommandCreator = true;
                 break;
             default:
                 success = false;
         }
 
         mailCreationController.showResponseTitle(player, success, customSubtitle);
-        if (!"message".equals(inputType) && !"command".equals(inputType)) {
+        if (reopenCommandCreator) {
+            mailCreationController.reopenCommandItemCreatorAsync(player);
+        } else if (reopenMailCreation) {
             mailCreationController.reopenCreationAsync(player);
         }
     }
@@ -413,6 +481,32 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
     public String colorize(String text) {
         return text.replace("&", "§");
+    }
+
+    public String getMailingsMessage(String key, String fallback) {
+        String path = "messages.mailings." + key;
+        return config.getString(path, fallback);
+    }
+
+    public String describeCron(String expression) {
+        if (expression == null || expression.isBlank()) {
+            return expression;
+        }
+        if (cronParser == null || cronDescriptor == null) {
+            return expression;
+        }
+
+        try {
+            Cron cron = cronParser.parse(expression);
+            cron.validate();
+            return cronDescriptor.describe(cron);
+        } catch (IllegalArgumentException ex) {
+            getLogger().fine(() -> "Unable to describe cron expression '" + expression + "': " + ex.getMessage());
+            return expression;
+        } catch (Exception ex) {
+            getLogger().fine(() -> "Unexpected error describing cron expression '" + expression + "': " + ex.getMessage());
+            return expression;
+        }
     }
 
     private void sendMailNotification(Player receiver, String mailId, String sender) {

@@ -11,6 +11,8 @@ mailings:
   # expire-days: Optional integer; how many days until the mail auto-expires (null = config default).
   # items: List of item directives converted directly into ItemStacks (supports namespace ids).
   # commands: Console commands executed when the mail is claimed (supports %player% placeholder).
+  # command-items: Preferred way to define console actions; each entry mirrors the GUI command bundles
+  #                (material, display name, lore, commands) and is shown in the mail view.
   # schedule:
   #   For FIRST_JOIN:
   #     delay-minutes / delay-seconds (optional) -> wait before delivering after first join.
@@ -62,3 +64,24 @@ mailings:
     schedule:
       cron: "0 12 1 1 *"       # Noon on January 1.
       max-runs: 1              # Limit to a single execution.
+
+  # --- Example 4: Rich command item with custom display ---
+  welcome-bundle:
+    enabled: false
+    type: REPEATING
+    receiver: "all"
+    message: "&aEnjoy your welcome bundle!"
+    sender: "Console"
+    command-items:
+      - material: CHEST
+        name: "&6Starter Bundle"
+        lore:
+          - "&7Runs multiple console actions"
+          - "&7and shows a custom icon"
+        commands:
+          - "give %player% minecraft:bread 8"
+          - "give %player% minecraft:stone_sword 1"
+          - "xp add %player% 5 levels"
+    schedule:
+      cron: "0 9 * * *"        # 09:00 every day.
+      max-runs: 1
