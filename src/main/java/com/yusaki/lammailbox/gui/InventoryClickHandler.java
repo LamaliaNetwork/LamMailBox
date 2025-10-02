@@ -89,6 +89,23 @@ public class InventoryClickHandler implements MailInventoryHandler {
         if (isMainGUI) {
             plugin.getViewingAsPlayer().remove(playerId);
         }
+
+        // Reset mail view pagination after we confirm the player is no longer in the mail view
+        final String mailViewTitle = plugin.colorize(config().getString("gui.mail-view.title"));
+        if (title.equals(mailViewTitle)) {
+            UUID capturedId = playerId;
+            plugin.getFoliaLib().getScheduler().runNextTick(task -> {
+                if (!player.isOnline()) {
+                    plugin.getMailViewPages().remove(capturedId);
+                    return;
+                }
+
+                String currentTitle = player.getOpenInventory().getTitle();
+                if (!mailViewTitle.equals(currentTitle)) {
+                    plugin.getMailViewPages().remove(capturedId);
+                }
+            });
+        }
     }
 
     private void handleMainGuiClick(InventoryClickEvent event, Player player, ItemStack clicked) {
@@ -243,9 +260,29 @@ public class InventoryClickHandler implements MailInventoryHandler {
 
     private void handleMailViewClick(InventoryClickEvent event, Player player, ItemStack clicked) {
         event.setCancelled(true);
+
+        // Handle pagination FIRST (before decorations, as pagination buttons may have decoration tags)
+        if (clicked != null && clicked.hasItemMeta()) {
+            ItemMeta meta = clicked.getItemMeta();
+            String action = meta.getPersistentDataContainer().get(new NamespacedKey(plugin, "action"),
+                    PersistentDataType.STRING);
+            if (action != null) {
+                if (action.equals("page-prev") || action.equals("page-next")) {
+                    String mailId = meta.getPersistentDataContainer().get(new NamespacedKey(plugin, "mailId"),
+                            PersistentDataType.STRING);
+                    if (mailId != null) {
+                        handlePageNavigation(player, mailId, action.equals("page-next"));
+                        return;
+                    }
+                }
+            }
+        }
+
+        // Then check for decoration commands
         if (executeDecorationCommand(event, player, clicked)) {
             return;
         }
+
         int buttonSlot = config().getInt("gui.mail-view.items.claim-button.slot");
         if ((isEnabled("gui.mail-view.items.claim-button") || isEnabled("gui.mail-view.items.dismiss-button"))
                 && event.getSlot() == buttonSlot) {
@@ -254,6 +291,31 @@ public class InventoryClickHandler implements MailInventoryHandler {
                 handleMailClaim(player, mailId);
             }
         }
+    }
+
+    private void handlePageNavigation(Player player, String mailId, boolean isNext) {
+        int currentPage = plugin.getMailViewPages().getOrDefault(player.getUniqueId(), 1);
+
+        List<ItemStack> items = plugin.getMailRepository().loadMailItems(mailId);
+        int commandCount = plugin.getMailRepository().findRecord(mailId)
+                .map(MailRecord::commands)
+                .map(List::size)
+                .orElse(0);
+
+        List<Integer> slots = config().getIntegerList("gui.mail-view.items.items-display.slots");
+        int slotsPerPage = (slots != null && !slots.isEmpty()) ? slots.size() : 21;
+        int totalElements = items.size() + commandCount;
+        int totalPages = Math.max(1, (totalElements + slotsPerPage - 1) / slotsPerPage);
+
+        int newPage = isNext ? currentPage + 1 : currentPage - 1;
+        newPage = Math.max(1, Math.min(totalPages, newPage));
+
+        if (newPage == currentPage) {
+            return;
+        }
+
+        plugin.getMailViewPages().put(player.getUniqueId(), newPage);
+        plugin.openMailView(player, mailId);
     }
 
     private boolean isEnabled(String path) {
