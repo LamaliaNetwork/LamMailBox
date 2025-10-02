@@ -9,7 +9,7 @@ mailings:
   # receiver: Target spec (player name, semicolon list, "all", etc.). Defaults to "all".
   # required-permission: Optional permission node players must have to receive the mail.
   # expire-days: Optional integer; how many days until the mail auto-expires (null = config default).
-  # items: List of item directives converted into /give commands (see buildGiveCommand helper).
+  # items: List of item directives converted directly into ItemStacks (supports namespace ids).
   # commands: Console commands executed when the mail is claimed (supports %player% placeholder).
   # schedule:
   #   For FIRST_JOIN:
