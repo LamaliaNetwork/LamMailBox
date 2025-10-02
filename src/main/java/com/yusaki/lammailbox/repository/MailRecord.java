@@ -1,5 +1,7 @@
 package com.yusaki.lammailbox.repository;
 
+import com.yusaki.lammailbox.model.CommandItem;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -24,6 +26,7 @@ public final class MailRecord {
     private final List<String> claimedPlayers;
     private final List<String> commands;
     private final String commandBlock;
+    private final List<CommandItem> commandItems;
 
     private MailRecord(String id,
                       String sender,
@@ -36,7 +39,8 @@ public final class MailRecord {
                       boolean adminMail,
                       List<String> claimedPlayers,
                       List<String> commands,
-                      String commandBlock) {
+                      String commandBlock,
+                      List<CommandItem> commandItems) {
         this.id = id;
         this.sender = sender;
         this.receiver = receiver;
@@ -49,6 +53,7 @@ public final class MailRecord {
         this.claimedPlayers = Collections.unmodifiableList(new ArrayList<>(claimedPlayers));
         this.commands = Collections.unmodifiableList(new ArrayList<>(commands));
         this.commandBlock = commandBlock;
+        this.commandItems = Collections.unmodifiableList(new ArrayList<>(commandItems));
     }
 
     public static Optional<MailRecord> from(String id, Map<String, Object> raw) {
@@ -66,6 +71,7 @@ public final class MailRecord {
         List<String> claimed = asStringList(raw.get("claimed-players"));
         List<String> commands = asStringList(raw.get("commands"));
         String commandBlock = asString(raw.get("command-block"));
+        List<CommandItem> commandItems = asCommandItemList(raw.get("command-items"));
 
         return Optional.of(new MailRecord(
                 id,
@@ -79,7 +85,8 @@ public final class MailRecord {
                 adminMail,
                 claimed,
                 commands,
-                commandBlock
+                commandBlock,
+                commandItems
         ));
     }
 
@@ -129,6 +136,20 @@ public final class MailRecord {
 
     public String commandBlock() {
         return commandBlock;
+    }
+
+    public List<CommandItem> commandItems() {
+        if (!commandItems.isEmpty()) {
+            return commandItems;
+        }
+        if (commands.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<CommandItem> legacy = new ArrayList<>();
+        for (String command : commands) {
+            legacy.add(CommandItem.legacyFromCommand(command));
+        }
+        return legacy;
     }
 
     public boolean hasBeenClaimedBy(String playerName) {
@@ -241,5 +262,22 @@ public final class MailRecord {
             return list;
         }
         return Collections.emptyList();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<CommandItem> asCommandItemList(Object value) {
+        if (!(value instanceof List<?> rawList)) {
+            return Collections.emptyList();
+        }
+        List<CommandItem> result = new ArrayList<>();
+        for (Object element : rawList) {
+            if (element instanceof Map<?, ?> map) {
+                CommandItem item = CommandItem.fromMap((Map<String, Object>) map);
+                if (item != null) {
+                    result.add(item);
+                }
+            }
+        }
+        return result;
     }
 }

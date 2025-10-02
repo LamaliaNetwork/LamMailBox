@@ -1,9 +1,9 @@
 package com.yusaki.lammailbox.service;
 
 import com.tcoded.folialib.FoliaLib;
+import com.yusaki.lammailbox.model.CommandItem;
 import com.yusaki.lammailbox.repository.MailRepository;
 import com.yusaki.lammailbox.session.MailCreationSession;
-import com.yusaki.lammailbox.util.ItemSerialization;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -169,13 +169,26 @@ public class DefaultMailService implements MailService {
         data.put("is-admin-mail", isAdminMail);
         data.put("claimed-players", new ArrayList<String>());
 
-        if (session.getCommandBlock() != null) {
-            data.put("command-block", ItemSerialization.serializeItem(session.getCommandBlock()));
-        } else {
-            data.put("command-block", null);
+        List<CommandItem> commandItems = session.getCommandItems() != null
+                ? new ArrayList<>(session.getCommandItems())
+                : new ArrayList<>();
+
+        if (commandItems.isEmpty() && session.getCommands() != null && !session.getCommands().isEmpty()) {
+            for (String legacyCommand : session.getCommands()) {
+                commandItems.add(CommandItem.legacyFromCommand(legacyCommand));
+            }
         }
-        List<String> commands = session.getCommands() != null ? new ArrayList<>(session.getCommands()) : new ArrayList<>();
-        data.put("commands", commands);
+
+        List<Map<String, Object>> serializedCommandItems = commandItems.stream()
+                .map(CommandItem::toMap)
+                .collect(Collectors.toList());
+        data.put("command-items", serializedCommandItems);
+
+        List<String> flattenedCommands = commandItems.stream()
+                .flatMap(item -> item.commands().stream())
+                .collect(Collectors.toList());
+        data.put("commands", flattenedCommands);
+        data.put("command-block", null);
 
         repository.saveMail(mailId, data);
         repository.saveMailItems(mailId, items);

@@ -1,6 +1,7 @@
 package com.yusaki.lammailbox.mailing;
 
 import com.yusaki.lammailbox.LamMailBox;
+import com.yusaki.lammailbox.model.CommandItem;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -11,6 +12,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Map;
 
 public final class MailingConfigLoader {
     private final LamMailBox plugin;
@@ -63,6 +65,11 @@ public final class MailingConfigLoader {
                 .expireDays(parsePositiveInt(section, "expire-days"))
                 .itemDirectives(cleanStrings(section.getStringList("items")))
                 .commands(cleanStrings(section.getStringList("commands")));
+
+        List<Map<?, ?>> rawCommandItems = section.getMapList("command-items");
+        if (rawCommandItems != null && !rawCommandItems.isEmpty()) {
+            builder.commandItems(parseCommandItems(rawCommandItems));
+        }
 
         ConfigurationSection schedule = section.getConfigurationSection("schedule");
 
@@ -149,6 +156,26 @@ public final class MailingConfigLoader {
             }
         }
         return cleaned;
+    }
+
+    private List<CommandItem> parseCommandItems(List<Map<?, ?>> rawItems) {
+        List<CommandItem> items = new ArrayList<>();
+        for (Map<?, ?> rawItem : rawItems) {
+            if (rawItem == null) {
+                continue;
+            }
+            Map<String, Object> normalized = new java.util.HashMap<>();
+            for (Map.Entry<?, ?> entry : rawItem.entrySet()) {
+                if (entry.getKey() != null) {
+                    normalized.put(entry.getKey().toString(), entry.getValue());
+                }
+            }
+            CommandItem item = CommandItem.fromMap(normalized);
+            if (item != null) {
+                items.add(item);
+            }
+        }
+        return items;
     }
 
     private Integer parsePositiveInt(ConfigurationSection section, String path) {

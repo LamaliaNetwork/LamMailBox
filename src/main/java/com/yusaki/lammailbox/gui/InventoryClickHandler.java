@@ -1,9 +1,9 @@
 package com.yusaki.lammailbox.gui;
 
 import com.yusaki.lammailbox.LamMailBox;
+import com.yusaki.lammailbox.model.CommandItem;
 import com.yusaki.lammailbox.repository.MailRecord;
 import com.yusaki.lammailbox.session.MailCreationSession;
-import com.yusaki.lammailbox.util.ItemSerialization;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -17,15 +17,18 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 public class InventoryClickHandler implements MailInventoryHandler {
     private final LamMailBox plugin;
     private final NamespacedKey decorationKey;
+    private final NamespacedKey commandItemIndexKey;
+    private final NamespacedKey commandItemActionKey;
 
     public InventoryClickHandler(LamMailBox plugin) {
         this.plugin = plugin;
         this.decorationKey = new NamespacedKey(plugin, "decorationPath");
+        this.commandItemIndexKey = new NamespacedKey(plugin, "commandItemIndex");
+        this.commandItemActionKey = new NamespacedKey(plugin, "commandItemAction");
     }
 
 
@@ -51,6 +54,8 @@ public class InventoryClickHandler implements MailInventoryHandler {
 
         String sentTitle = plugin.colorize(config().getString("gui.sent-mail.title"));
         String sentViewingPrefix = plugin.colorize(config().getString("gui.sent-mail.title") + " &7(as ");
+        String commandItemsTitle = plugin.colorize(config().getString("gui.command-items-editor.title", "Command Items"));
+        String commandItemCreatorTitle = plugin.colorize(config().getString("gui.command-item-creator.title", "Create Command Item"));
 
         if (isMainGUI) {
             handleMainGuiClick(event, player, clicked);
@@ -64,6 +69,10 @@ public class InventoryClickHandler implements MailInventoryHandler {
             handleItemsGuiClick(event);
         } else if (title.equals(plugin.colorize(config().getString("gui.mail-view.title")))) {
             handleMailViewClick(event, player, clicked);
+        } else if (title.equals(commandItemsTitle)) {
+             handleCommandItemsEditorClick(event, player, clicked);
+        } else if (title.equals(commandItemCreatorTitle)) {
+             handleCommandItemCreatorClick(event, player, clicked);
         }
     }
 
@@ -222,11 +231,11 @@ public class InventoryClickHandler implements MailInventoryHandler {
             plugin.handleMailSend(p);
         } else if (isEnabled("gui.create-mail.items.command-block") &&
                 slot == config().getInt("gui.create-mail.items.command-block.slot")) {
-            if (event.getClick().isRightClick()) {
-                removeLastCommandAndRefresh(p, session);
-            } else {
-                handleCommandBlockItem(p, event, session);
+            if (!p.hasPermission(config().getString("settings.admin-permission"))) {
+                p.sendMessage(plugin.colorize(config().getString("messages.no-permission")));
+                return;
             }
+            plugin.openCommandItemsEditor(p);
         } else if (isEnabled("gui.create-mail.items.schedule-clock") &&
                 slot == config().getInt("gui.create-mail.items.schedule-clock.slot")) {
             handleScheduleClockClick(event, p);
@@ -255,6 +264,119 @@ public class InventoryClickHandler implements MailInventoryHandler {
                 session.setItems(items);
                 player.closeInventory();
             }
+        }
+    }
+
+    private void handleCommandItemsEditorClick(InventoryClickEvent event, Player player, ItemStack clicked) {
+        event.setCancelled(true);
+        MailCreationSession session = plugin.getMailSessions()
+                .computeIfAbsent(player.getUniqueId(), key -> new MailCreationSession());
+        ensureCommandItemsInitialized(session);
+
+        ItemMeta meta = clicked.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+
+        Integer index = meta.getPersistentDataContainer().get(commandItemIndexKey, PersistentDataType.INTEGER);
+        String action = meta.getPersistentDataContainer().get(commandItemActionKey, PersistentDataType.STRING);
+
+        if (index != null) {
+            List<CommandItem> items = session.getCommandItems();
+            if (index < 0 || index >= items.size()) {
+                return;
+            }
+            if (event.isRightClick()) {
+                items.remove((int) index);
+                session.setCommandItems(items);
+                plugin.openCommandItemsEditor(player);
+            } else {
+                session.setCommandItemEditIndex(index);
+                session.setCommandItemDraft(items.get(index).toBuilder());
+                plugin.openCommandItemCreator(player);
+            }
+            return;
+        }
+
+        if (action == null) {
+            return;
+        }
+
+        switch (action) {
+            case "add":
+                session.setCommandItemEditIndex(null);
+                session.setCommandItemDraft(new CommandItem.Builder());
+                plugin.openCommandItemCreator(player);
+                break;
+            case "back":
+                plugin.openCreateMailGUI(player);
+                break;
+        }
+    }
+
+    private void handleCommandItemCreatorClick(InventoryClickEvent event, Player player, ItemStack clicked) {
+        event.setCancelled(true);
+        MailCreationSession session = plugin.getMailSessions()
+                .computeIfAbsent(player.getUniqueId(), key -> new MailCreationSession());
+        ensureCommandItemsInitialized(session);
+
+        ItemMeta meta = clicked.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+        String action = meta.getPersistentDataContainer().get(commandItemActionKey, PersistentDataType.STRING);
+        if (action == null) {
+            return;
+        }
+
+        switch (action) {
+            case "material":
+                startAwaiting(player, "command-item-material", "command-item-material", config().getString("messages.enter-command-item-material"));
+                break;
+            case "name":
+                startAwaiting(player, "command-item-name", "command-item-name", config().getString("messages.enter-command-item-name"));
+                break;
+            case "lore":
+                if (event.isRightClick()) {
+                    CommandItem.Builder draft = session.getCommandItemDraft();
+                    if (draft != null && draft.removeLastLoreLine()) {
+                        player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
+                                config().getString("messages.command-item-lore-removed", "&a✔ Removed last lore line.")));
+                    } else {
+                        player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
+                                config().getString("messages.command-item-lore-empty", "&c✖ No lore lines to remove.")));
+                    }
+                    plugin.openCommandItemCreator(player);
+                } else {
+                    startAwaiting(player, "command-item-lore", "command-item-lore", config().getString("messages.enter-command-item-lore"));
+                }
+                break;
+            case "command":
+                if (event.isRightClick()) {
+                    CommandItem.Builder draft = session.getCommandItemDraft();
+                    if (draft != null && draft.removeLastCommand()) {
+                        player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
+                                config().getString("messages.command-item-command-removed", "&a✔ Removed last command.")));
+                    } else {
+                        player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
+                                config().getString("messages.command-item-command-empty", "&c✖ No commands to remove.")));
+                    }
+                    plugin.openCommandItemCreator(player);
+                } else {
+                    startAwaiting(player, "command-item-command", "command-item-command", config().getString("messages.enter-command-item-command"));
+                }
+                break;
+            case "save":
+                if (plugin.getMailCreationController().finalizeCommandItem(player, session)) {
+                    plugin.openCommandItemsEditor(player);
+                } else {
+                    plugin.openCommandItemCreator(player);
+                }
+                break;
+            case "cancel":
+                plugin.getMailCreationController().cancelCommandItemEdit(session);
+                plugin.openCommandItemsEditor(player);
+                break;
         }
     }
 
@@ -298,8 +420,7 @@ public class InventoryClickHandler implements MailInventoryHandler {
 
         List<ItemStack> items = plugin.getMailRepository().loadMailItems(mailId);
         int commandCount = plugin.getMailRepository().findRecord(mailId)
-                .map(MailRecord::commands)
-                .map(List::size)
+                .map(record -> record.commandItems().size())
                 .orElse(0);
 
         List<Integer> slots = config().getIntegerList("gui.mail-view.items.items-display.slots");
@@ -392,67 +513,11 @@ public class InventoryClickHandler implements MailInventoryHandler {
         }
     }
 
-    private void removeLastCommandAndRefresh(Player player, MailCreationSession session) {
-        List<String> commands = new ArrayList<>(session.getCommands());
-        if (commands.isEmpty()) {
-            return;
-        }
-        commands.remove(commands.size() - 1);
-        session.setCommands(commands);
-
-        ItemStack commandBlock = session.getCommandBlock();
-        if (commandBlock == null) {
-            return;
-        }
-        ItemStack displayBlock = commandBlock.clone();
-        ItemMeta meta = displayBlock.getItemMeta();
-        List<String> lore = meta.hasLore() ? new ArrayList<>(meta.getLore()) : new ArrayList<>();
-        lore.add(plugin.colorize(config().getString("gui.create-mail.items.command-block.commands-prefix")));
-        for (String cmd : commands) {
-            lore.add(plugin.colorize(config().getString("gui.create-mail.items.command-block.command-format")
-                    .replace("%command%", cmd)));
-        }
-        meta.setLore(lore);
-        displayBlock.setItemMeta(meta);
-        session.setDisplayCommandBlock(displayBlock);
-        plugin.openCreateMailGUI(player);
-    }
-
-    private void handleCommandBlockItem(Player player, InventoryClickEvent event, MailCreationSession session) {
-        if (!player.hasPermission(config().getString("settings.admin-permission"))) {
-            return;
-        }
-        ItemStack cursor = event.getCursor();
-        if (cursor != null && !cursor.getType().isAir()) {
-            List<String> commands = new ArrayList<>(session.getCommands());
-            session.setCommandBlock(cursor.clone());
-            ItemStack displayBlock = cursor.clone();
-            ItemMeta meta = displayBlock.getItemMeta();
-            List<String> lore = meta.hasLore() ? new ArrayList<>(meta.getLore()) : new ArrayList<>();
-            lore.add(plugin.colorize(config().getString("messages.command-prefix")));
-            for (String cmd : commands) {
-                lore.add(plugin.colorize(config().getString("messages.command-format-display")
-                        .replace("%command%", cmd)));
-            }
-            meta.setLore(lore);
-            displayBlock.setItemMeta(meta);
-            session.setDisplayCommandBlock(displayBlock);
-            event.getView().setCursor(null);
-            plugin.openCreateMailGUI(player);
-        } else {
-            plugin.getAwaitingInput().put(player.getUniqueId(), "command");
-            plugin.getMailCreationController().showInputTitle(player, "command");
-            player.sendMessage(plugin.colorize(plugin.getConfig().getString("messages.prefix") +
-                    plugin.getConfig().getString("messages.enter-command")));
-            player.closeInventory();
-        }
-    }
-
     private void handleMailClaim(Player player, String mailId) {
         List<ItemStack> items = plugin.getMailRepository().loadMailItems(mailId);
         Optional<MailRecord> mailRecord = plugin.getMailRepository().findRecord(mailId);
-        List<String> commands = mailRecord.map(MailRecord::commands).orElse(Collections.emptyList());
-        boolean hasRewards = !items.isEmpty() || !commands.isEmpty();
+        List<CommandItem> commandItems = mailRecord.map(MailRecord::commandItems).orElse(Collections.emptyList());
+        boolean hasRewards = !items.isEmpty() || !commandItems.isEmpty();
 
         if (!items.isEmpty()) {
             long emptySlots = Arrays.stream(player.getInventory().getStorageContents())
@@ -468,11 +533,13 @@ public class InventoryClickHandler implements MailInventoryHandler {
             items.forEach(item -> player.getInventory().addItem(item));
         }
 
-        if (!commands.isEmpty()) {
+        if (!commandItems.isEmpty()) {
             plugin.getFoliaLib().getScheduler().runNextTick(task -> {
-                for (String command : commands) {
-                    String processed = command.replace("%player%", player.getName());
-                    Bukkit.dispatchCommand(Bukkit.getConsoleSender(), processed);
+                for (CommandItem commandItem : commandItems) {
+                    for (String command : commandItem.commands()) {
+                        String processed = command.replace("%player%", player.getName());
+                        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), processed);
+                    }
                 }
             });
         }
@@ -527,5 +594,21 @@ public class InventoryClickHandler implements MailInventoryHandler {
 
     private FileConfiguration config() {
         return plugin.getConfig();
+    }
+
+    private void ensureCommandItemsInitialized(MailCreationSession session) {
+        if (session.getCommandItems() == null) {
+            session.setCommandItems(new ArrayList<>());
+        }
+    }
+
+    private void startAwaiting(Player player, String key, String titleKey, String message) {
+        plugin.getAwaitingInput().put(player.getUniqueId(), key);
+        plugin.getInMailCreation().put(player.getUniqueId(), true);
+        plugin.getMailCreationController().showInputTitle(player, titleKey);
+        if (message != null) {
+            player.sendMessage(plugin.colorize(plugin.getConfig().getString("messages.prefix") + message));
+        }
+        player.closeInventory();
     }
 }
