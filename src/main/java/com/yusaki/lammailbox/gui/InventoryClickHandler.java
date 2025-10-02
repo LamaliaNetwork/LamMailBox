@@ -373,10 +373,6 @@ public class InventoryClickHandler implements MailInventoryHandler {
                     plugin.openCommandItemCreator(player);
                 }
                 break;
-            case "cancel":
-                plugin.getMailCreationController().cancelCommandItemEdit(session);
-                plugin.openCommandItemsEditor(player);
-                break;
         }
     }
 
