@@ -131,6 +131,25 @@ public final class SqliteMailingStatusRepository implements MailingStatusReposit
     }
 
     @Override
+    public boolean incrementRunCountIfBelow(String mailingId, int maxRuns) {
+        try (Connection connection = getConnection()) {
+            ensureRow(connection, mailingId, null);
+            try (PreparedStatement ps = connection.prepareStatement(
+                    "UPDATE mailing_status SET run_count = run_count + 1 "
+                    + "WHERE mailing_id = ? AND player_uuid = ? AND run_count < ?")) {
+                ps.setString(1, mailingId);
+                ps.setString(2, GLOBAL_KEY);
+                ps.setInt(3, maxRuns);
+                int affected = ps.executeUpdate();
+                return affected > 0;
+            }
+        } catch (SQLException ex) {
+            plugin.getLogger().warning("Failed to conditionally increment run count for mailing " + mailingId + ": " + ex.getMessage());
+        }
+        return false;
+    }
+
+    @Override
     public Optional<Long> getLastRunForPlayer(String mailingId, UUID playerId) {
         String sql = "SELECT last_sent FROM mailing_status WHERE mailing_id = ? AND player_uuid = ?";
         try (Connection connection = getConnection();
@@ -183,6 +202,23 @@ public final class SqliteMailingStatusRepository implements MailingStatusReposit
     @Override
     public void markReceived(String mailingId, UUID playerId, long timestamp) {
         setLastRunForPlayer(mailingId, playerId, timestamp);
+    }
+
+    @Override
+    public boolean markReceivedIfNew(String mailingId, UUID playerId, long timestamp) {
+        String sql = "INSERT INTO mailing_status (mailing_id, player_uuid, last_sent, run_count) VALUES (?, ?, ?, 0) "
+                + "ON CONFLICT(mailing_id, player_uuid) DO NOTHING";
+        try (Connection connection = getConnection();
+             PreparedStatement ps = connection.prepareStatement(sql)) {
+            ps.setString(1, mailingId);
+            ps.setString(2, playerId.toString());
+            ps.setLong(3, timestamp);
+            int affected = ps.executeUpdate();
+            return affected > 0;
+        } catch (SQLException ex) {
+            plugin.getLogger().warning("Failed to conditionally mark received for mailing " + mailingId + ": " + ex.getMessage());
+        }
+        return false;
     }
 
     @Override

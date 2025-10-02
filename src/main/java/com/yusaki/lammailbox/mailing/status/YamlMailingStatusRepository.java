@@ -55,6 +55,19 @@ public final class YamlMailingStatusRepository implements MailingStatusRepositor
     }
 
     @Override
+    public synchronized boolean incrementRunCountIfBelow(String mailingId, int maxRuns) {
+        ensureMailingSection(mailingId);
+        String path = nodePath(mailingId, "run-count");
+        int current = yaml.getInt(path, 0);
+        if (current >= maxRuns) {
+            return false;
+        }
+        yaml.set(path, current + 1);
+        saveQuietly();
+        return true;
+    }
+
+    @Override
     public synchronized Optional<Long> getLastRunForPlayer(String mailingId, UUID playerId) {
         String path = nodePath(mailingId, "players." + playerId);
         if (!yaml.contains(path)) {
@@ -78,6 +91,18 @@ public final class YamlMailingStatusRepository implements MailingStatusRepositor
     @Override
     public synchronized void markReceived(String mailingId, UUID playerId, long timestamp) {
         setLastRunForPlayer(mailingId, playerId, timestamp);
+    }
+
+    @Override
+    public synchronized boolean markReceivedIfNew(String mailingId, UUID playerId, long timestamp) {
+        String path = nodePath(mailingId, "players." + playerId);
+        if (yaml.contains(path)) {
+            return false;
+        }
+        ensureMailingSection(mailingId);
+        yaml.set(path, timestamp);
+        saveQuietly();
+        return true;
     }
 
     @Override
