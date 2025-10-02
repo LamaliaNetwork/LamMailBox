@@ -124,33 +124,36 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
 
     private ItemStack createCommandPlaceholder(String commandPath, CommandItem commandItem) {
         ItemStack base = commandItem.toPreviewItem(plugin);
-        ItemMeta meta = base.getItemMeta();
-        if (meta == null) {
-            return base;
+
+        // Check if this is a legacy command (single-line command with default styling)
+        boolean isLegacy = commandItem.displayName() != null &&
+                           commandItem.displayName().equals("&6Console Command");
+
+        if (isLegacy) {
+            // Apply config overrides for legacy commands
+            String legacyPath = commandPath.replace("command-item", "command-legacy");
+            ItemMeta meta = base.getItemMeta();
+            if (meta != null) {
+                Map<String, String> placeholders = createCommandItemPlaceholders(commandItem);
+
+                String overrideName = config().getString(legacyPath + ".name");
+                if (overrideName != null && !overrideName.isBlank()) {
+                    meta.setDisplayName(plugin.colorize(applyPlaceholders(overrideName, placeholders)));
+                }
+
+                List<String> configuredLore = config().getStringList(legacyPath + ".lore");
+                if (!configuredLore.isEmpty()) {
+                    List<String> lore = configuredLore.stream()
+                            .map(line -> plugin.colorize(applyPlaceholders(line, placeholders)))
+                            .collect(Collectors.toList());
+                    meta.setLore(lore);
+                }
+
+                base.setItemMeta(meta);
+            }
         }
 
-        Map<String, String> placeholders = createCommandItemPlaceholders(commandItem);
-
-        String overrideName = config().getString(commandPath + ".name");
-        if (overrideName != null && !overrideName.isBlank()) {
-            meta.setDisplayName(plugin.colorize(applyPlaceholders(overrideName, placeholders)));
-        }
-
-        List<String> configuredLore = config().getStringList(commandPath + ".lore");
-        List<String> lore = new ArrayList<>();
-        if (!configuredLore.isEmpty()) {
-            lore.addAll(configuredLore.stream()
-                    .map(line -> plugin.colorize(applyPlaceholders(line, placeholders)))
-                    .collect(Collectors.toList()));
-        }
-
-        appendDetailLines(lore, "&7Commands:", commandItem.commands(), 5, true);
-        appendDetailLines(lore, "&7Lore:", commandItem.lore(), 5, false);
-
-        if (!lore.isEmpty()) {
-            meta.setLore(lore);
-        }
-        base.setItemMeta(meta);
+        // User-created CommandItems are returned as-is
         return base;
     }
 
@@ -1083,36 +1086,37 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
 
     private ItemStack buildCommandItemEditorEntry(CommandItem commandItem, int index) {
         String base = "gui.command-items-editor.items.command-item";
-            ItemStack stack = commandItem.toPreviewItem(plugin);
-            ItemMeta meta = stack.getItemMeta();
-            if (meta != null) {
-                Map<String, String> placeholders = createCommandItemPlaceholders(commandItem);
-                placeholders.put("%index%", String.valueOf(index + 1));
-                placeholders.put("%material%", commandItem.materialKey());
-                placeholders.put("%name%", commandItem.displayName());
+        ItemStack stack = commandItem.toPreviewItem(plugin);
+        ItemMeta meta = stack.getItemMeta();
+        if (meta != null) {
+            // Keep the actual item name - don't overwrite with template
 
-                String name = config().getString(base + ".name", meta.getDisplayName());
-                meta.setDisplayName(plugin.colorize(applyPlaceholders(name, placeholders)));
-
-                List<String> loreTemplate = config().getStringList(base + ".lore");
-                List<String> lore = new ArrayList<>();
-                if (!loreTemplate.isEmpty()) {
-                    lore.addAll(loreTemplate.stream()
-                            .map(line -> plugin.colorize(applyPlaceholders(line, placeholders)))
-                            .collect(Collectors.toList()));
-                }
-
-                appendDetailLines(lore, "&7Commands:", commandItem.commands(), 5, true);
-                appendDetailLines(lore, "&7Lore:", commandItem.lore(), 5, false);
-
-                if (!lore.isEmpty()) {
-                    meta.setLore(lore);
-                }
-
-                meta.getPersistentDataContainer().set(commandItemIndexKey, PersistentDataType.INTEGER, index);
-                stack.setItemMeta(meta);
+            // Start with existing lore from the item (user's configured lore)
+            List<String> lore = new ArrayList<>();
+            if (meta.hasLore()) {
+                lore.addAll(meta.getLore());
             }
-            return stack;
+
+            // Append greyed out command information
+            String commandHeader = config().getString(base + ".command-header", "&7Commands:");
+            appendDetailLines(lore, commandHeader, commandItem.commands(), 5, true);
+
+            // Append action instructions from config
+            List<String> actionLore = config().getStringList(base + ".lore");
+            if (!actionLore.isEmpty()) {
+                if (!lore.isEmpty()) {
+                    lore.add(plugin.colorize("&7"));
+                }
+                lore.addAll(actionLore.stream()
+                        .map(plugin::colorize)
+                        .collect(Collectors.toList()));
+            }
+
+            meta.setLore(lore);
+            meta.getPersistentDataContainer().set(commandItemIndexKey, PersistentDataType.INTEGER, index);
+            stack.setItemMeta(meta);
+        }
+        return stack;
     }
 
     private ItemStack buildEditorStaticButton(String path, String action) {
