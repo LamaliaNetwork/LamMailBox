@@ -78,36 +78,47 @@ public final class MailingScheduler {
         if (!running) {
             return;
         }
-        boolean firstJoin = !player.hasPlayedBefore();
-        String playerName = player.getName();
-        var uuid = player.getUniqueId();
 
-        for (MailingDefinition definition : firstJoinDefinitions) {
-            if (!definition.enabled() || definition.type() != MailingType.FIRST_JOIN) {
-                continue;
+        // Schedule on player's region thread to safely access player state
+        foliaLib.getScheduler().runAtEntity(player, task -> {
+            if (!player.isOnline()) {
+                return;
             }
+
+            boolean firstJoin = !player.hasPlayedBefore();
             if (!firstJoin) {
-                continue;
-            }
-            if (statusRepository.hasReceived(definition.id(), uuid)) {
-                continue;
-            }
-            if (definition.requiredPermission() != null && !player.hasPermission(definition.requiredPermission())) {
-                continue;
+                return;
             }
 
-            long now = System.currentTimeMillis();
-            statusRepository.markReceived(definition.id(), uuid, now);
+            String playerName = player.getName();
+            var uuid = player.getUniqueId();
 
-            Runnable delivery = () -> deliverToSinglePlayer(definition, playerName);
-            Duration delay = definition.firstJoinDelay();
-            if (delay != null && !delay.isNegative() && !delay.isZero()) {
-                long ticks = Math.max(1L, delay.toMillis() / 50L);
-                foliaLib.getScheduler().runLater(task -> delivery.run(), ticks);
-            } else {
-                submit(delivery);
+            for (MailingDefinition definition : firstJoinDefinitions) {
+                if (!definition.enabled() || definition.type() != MailingType.FIRST_JOIN) {
+                    continue;
+                }
+
+                if (definition.requiredPermission() != null && !player.hasPermission(definition.requiredPermission())) {
+                    continue;
+                }
+
+                // Atomically mark as received - prevents duplicates
+                long now = System.currentTimeMillis();
+                if (!statusRepository.markReceivedIfNew(definition.id(), uuid, now)) {
+                    // Player already received this mailing
+                    continue;
+                }
+
+                Runnable delivery = () -> deliverToSinglePlayer(definition, playerName);
+                Duration delay = definition.firstJoinDelay();
+                if (delay != null && !delay.isNegative() && !delay.isZero()) {
+                    long ticks = Math.max(1L, delay.toMillis() / 50L);
+                    foliaLib.getScheduler().runLater(delayTask -> delivery.run(), ticks);
+                } else {
+                    submit(delivery);
+                }
             }
-        }
+        });
     }
 
     private void tick() {
@@ -126,10 +137,6 @@ public final class MailingScheduler {
             return;
         }
         Integer maxRuns = definition.maxRuns();
-        int runCount = statusRepository.getRunCount(definition.id());
-        if (maxRuns != null && runCount >= maxRuns) {
-            return;
-        }
 
         long lastRunMillis = statusRepository.getLastRun(definition.id());
         ZonedDateTime reference = lastRunMillis > 0
@@ -146,16 +153,26 @@ public final class MailingScheduler {
             if (next.isAfter(now)) {
                 break;
             }
-            if (maxRuns != null && runCount >= maxRuns) {
-                break;
+
+            // Update lastRun FIRST to prevent re-processing on server crash
+            long scheduledMillis = next.toInstant().toEpochMilli();
+            statusRepository.setLastRun(definition.id(), scheduledMillis);
+
+            // Atomically check if we can increment, respecting max-runs
+            if (maxRuns != null) {
+                if (!statusRepository.incrementRunCountIfBelow(definition.id(), maxRuns)) {
+                    // Already at or above max runs
+                    break;
+                }
+            } else {
+                // No max-runs limit, just increment
+                statusRepository.incrementRunCount(definition.id());
             }
 
-            if (deliverGlobal(definition).isPresent()) {
-                long scheduledMillis = next.toInstant().toEpochMilli();
-                statusRepository.setLastRun(definition.id(), scheduledMillis);
-                statusRepository.incrementRunCount(definition.id());
-                runCount++;
-            } else {
+            // Deliver the mailing
+            if (!deliverGlobal(definition).isPresent()) {
+                // Delivery failed, but lastRun is already updated to prevent re-processing
+                // and run count is incremented to prevent infinite retries
                 break;
             }
 
