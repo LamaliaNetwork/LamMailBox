@@ -57,6 +57,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
     private Map<UUID, Boolean> inMailCreation;
     private Map<UUID, String> deleteConfirmations;
     private Map<UUID, String> viewingAsPlayer;
+    private Map<UUID, Integer> mailViewPages;
     private FoliaLib foliaLib;
     private InventoryClickHandler inventoryClickHandler;
     private MailGuiFactory mailGuiFactory;
@@ -86,6 +87,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
         inMailCreation = new HashMap<>();
         deleteConfirmations = new HashMap<>();
         viewingAsPlayer = new HashMap<>();
+        mailViewPages = new HashMap<>();
         inventoryClickHandler = new InventoryClickHandler(this);
         mailGuiFactory = new ConfigMailGuiFactory(this);
         mailCreationController = new MailCreationController(this);
@@ -516,6 +518,10 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
     public Map<UUID, String> getViewingAsPlayer() {
         return viewingAsPlayer;
+    }
+
+    public Map<UUID, Integer> getMailViewPages() {
+        return mailViewPages;
     }
 
     public FoliaLib getFoliaLib() {

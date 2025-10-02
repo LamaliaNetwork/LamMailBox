@@ -288,11 +288,28 @@ gui:
       command-item:
         enabled: true
         material: COMMAND_BLOCK
-        name: '&6Console Action #%index%'
+        name: '&6Command'
         lore:
-          - '&7Command: &f%summary%'
-          - '&7Runs a hidden server command.'
-          - '&7Total commands: &f%total%'
+          - '&7Executes when claimed'
+
+      pagination:
+        previous-button:
+          enabled: true
+          material: ARROW
+          name: '&e← Previous'
+          slot: 39
+
+        next-button:
+          enabled: true
+          material: ARROW
+          name: '&eNext →'
+          slot: 41
+
+        page-indicator:
+          enabled: true
+          material: BOOK
+          name: '&6Page %current%/%total%'
+          slot: 40
 
       claim-button:
         enabled: true
