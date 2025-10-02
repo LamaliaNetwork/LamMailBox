@@ -56,13 +56,16 @@ public final class CommandItem {
         ItemStack stack = new ItemStack(material);
         ItemMeta meta = stack.getItemMeta();
         if (meta != null) {
-            String name = Objects.requireNonNullElse(displayName, "&6Command Item");
+            String name = displayName == null || displayName.isBlank()
+                    ? "&6Console Action"
+                    : displayName;
             meta.setDisplayName(plugin.colorize(name));
 
-            List<String> coloredLore = lore.isEmpty()
-                    ? Collections.singletonList(plugin.colorize("&7Executes console commands"))
-                    : lore.stream().map(plugin::colorize).toList();
-            meta.setLore(coloredLore);
+            List<String> displayLore = lore.isEmpty() ? Collections.emptyList() : lore;
+            List<String> loreLines = displayLore.stream()
+                    .map(plugin::colorize)
+                    .toList();
+            meta.setLore(loreLines);
             stack.setItemMeta(meta);
         }
         return stack;
