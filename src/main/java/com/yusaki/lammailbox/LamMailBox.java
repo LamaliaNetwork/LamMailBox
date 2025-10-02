@@ -455,7 +455,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
         if (receiverSpec.equalsIgnoreCase("all")) {
             Bukkit.getOnlinePlayers().forEach(player ->
-                    sendMailNotification(player, mailId, senderName));
+                    scheduleNotification(player, mailId, senderName));
             return;
         }
 
@@ -463,14 +463,23 @@ public class LamMailBox extends JavaPlugin implements Listener {
             Arrays.stream(receiverSpec.split(";"))
                     .map(Bukkit::getPlayer)
                     .filter(Objects::nonNull)
-                    .forEach(player -> sendMailNotification(player, mailId, senderName));
+                    .forEach(player -> scheduleNotification(player, mailId, senderName));
             return;
         }
 
         Player receiver = Bukkit.getPlayer(receiverSpec);
         if (receiver != null) {
-            sendMailNotification(receiver, mailId, senderName);
+            scheduleNotification(receiver, mailId, senderName);
         }
+    }
+
+    private void scheduleNotification(Player player, String mailId, String senderName) {
+        // Schedule on player's region thread for Folia compatibility
+        foliaLib.getScheduler().runAtEntity(player, task -> {
+            if (player.isOnline()) {
+                sendMailNotification(player, mailId, senderName);
+            }
+        });
     }
 
     public void dispatchMailNotifications(String receiverSpec, String mailId, String senderName) {
