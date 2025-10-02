@@ -715,30 +715,11 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         // Preview item
         int previewSlot = config().getInt(base + ".items.preview.slot", size / 2);
         ItemStack preview = draft.buildPreviewItem(plugin);
-        ItemMeta previewMeta = preview.getItemMeta();
-        if (previewMeta != null) {
-            String previewName = config().getString(base + ".items.preview.name");
-            if (previewName != null) {
-                previewMeta.setDisplayName(plugin.colorize(applyPlaceholders(previewName, placeholders)));
-            }
-            List<String> previewLore = config().getStringList(base + ".items.preview.lore");
-            if (!previewLore.isEmpty()) {
-                previewMeta.setLore(previewLore.stream()
-                        .map(line -> plugin.colorize(applyPlaceholders(line, placeholders)))
-                        .collect(Collectors.toList()));
-            }
-            preview.setItemMeta(previewMeta);
-        }
         inv.setItem(previewSlot, preview);
 
         if (isEnabled(base + ".items.save-button")) {
             ItemStack save = buildEditorStaticButton(base + ".items.save-button", "save");
             inv.setItem(config().getInt(base + ".items.save-button.slot", size - 6), save);
-        }
-
-        if (isEnabled(base + ".items.cancel-button")) {
-            ItemStack cancel = buildEditorStaticButton(base + ".items.cancel-button", "cancel");
-            inv.setItem(config().getInt(base + ".items.cancel-button.slot", size - 4), cancel);
         }
 
         return inv;

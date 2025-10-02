@@ -330,9 +330,6 @@ gui:
           - '&7Right-click to remove last'
         slot: 14
       preview:
-        name: '&aPreview'
-        lore:
-          - '&7Shows the final appearance'
         slot: 16
       save-button:
         enabled: true
@@ -340,14 +337,7 @@ gui:
         name: '&aSave Command Item'
         lore:
           - '&7Store this command action'
-        slot: 24
-      cancel-button:
-        enabled: true
-        material: RED_CONCRETE
-        name: '&cCancel'
-        lore:
-          - '&7Discard changes'
-        slot: 25
+        slot: 26
 
   mail-view:
     title: "&8ᴠɪᴇᴡɪɴɢ ᴍᴀɪʟ"
