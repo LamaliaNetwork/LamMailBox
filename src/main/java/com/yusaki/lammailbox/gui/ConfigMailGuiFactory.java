@@ -30,6 +30,138 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         this.plugin = plugin;
     }
 
+    private ItemStack styledCommandIcon(String basePath, ItemStack existing, int commandCount, String summary) {
+        ItemStack stack = existing != null ? existing.clone() : null;
+
+        String materialName = config().getString(basePath + ".material");
+        if (materialName != null && !materialName.isBlank()) {
+            try {
+                Material material = Material.valueOf(materialName.trim().toUpperCase(Locale.ROOT));
+                if (stack == null || stack.getType() != material) {
+                    stack = new ItemStack(material);
+                }
+            } catch (IllegalArgumentException ignored) {
+                if (stack == null) {
+                    stack = new ItemStack(Material.COMMAND_BLOCK);
+                }
+            }
+        } else if (stack == null) {
+            stack = new ItemStack(Material.COMMAND_BLOCK);
+        }
+
+        if (stack == null) {
+            stack = new ItemStack(Material.COMMAND_BLOCK);
+        }
+
+        ItemMeta meta = stack.getItemMeta();
+        if (meta != null) {
+            String displayName = config().getString(basePath + ".name");
+            if (displayName != null && !displayName.isBlank()) {
+                meta.setDisplayName(plugin.colorize(displayName
+                        .replace("%count%", String.valueOf(commandCount))
+                        .replace("%summary%", summary)));
+            }
+
+            List<String> rawLore = config().getStringList(basePath + ".lore");
+            if (rawLore == null || rawLore.isEmpty()) {
+                rawLore = Collections.singletonList("&7Contains hidden console actions");
+            }
+            List<String> lore = rawLore.stream()
+                    .map(line -> plugin.colorize(line
+                            .replace("%count%", String.valueOf(commandCount))
+                            .replace("%summary%", summary)))
+                    .collect(Collectors.toList());
+            meta.setLore(lore);
+            stack.setItemMeta(meta);
+        }
+        return stack;
+    }
+
+    private void placeItemsAndCommands(Inventory inv,
+                                       List<ItemStack> items,
+                                       List<String> commands,
+                                       String itemPath,
+                                       String commandPath) {
+        List<Integer> itemSlots = config().getIntegerList(itemPath + ".slots");
+        if (itemSlots == null || itemSlots.isEmpty()) {
+            return;
+        }
+
+        int slotIndex = 0;
+        for (ItemStack item : items) {
+            if (slotIndex >= itemSlots.size()) {
+                plugin.getLogger().warning("Mail item grid is full; some attachments cannot be displayed.");
+                return;
+            }
+            inv.setItem(itemSlots.get(slotIndex++), item);
+        }
+
+        if (commands == null || commands.isEmpty() || !isEnabled(commandPath)) {
+            return;
+        }
+
+        final int totalCommands = commands.size();
+        for (int i = 0; i < totalCommands; i++) {
+            if (slotIndex >= itemSlots.size()) {
+                plugin.getLogger().warning("Mail command grid is full; some commands cannot be displayed.");
+                return;
+            }
+            final int index = i + 1;
+            final int total = totalCommands;
+            String summary = summarizeCommand(commands.get(i));
+            ItemStack commandIcon = styledCommandIcon(commandPath, null, totalCommands, summary);
+            ItemMeta meta = commandIcon.getItemMeta();
+            if (meta != null) {
+                if (meta.hasDisplayName()) {
+                    meta.setDisplayName(meta.getDisplayName()
+                            .replace("%index%", String.valueOf(index))
+                            .replace("%total%", String.valueOf(total)));
+                }
+                if (meta.hasLore()) {
+                    List<String> lore = meta.getLore().stream()
+                            .map(line -> line
+                                    .replace("%index%", String.valueOf(index))
+                                    .replace("%total%", String.valueOf(total)))
+                            .collect(Collectors.toList());
+                    meta.setLore(lore);
+                }
+                commandIcon.setItemMeta(meta);
+            }
+            inv.setItem(itemSlots.get(slotIndex++), commandIcon);
+        }
+    }
+
+    private String summarizeCommand(String command) {
+        if (command == null || command.isBlank()) {
+            return "Console";
+        }
+
+        String trimmed = command.trim();
+        if (trimmed.startsWith("/")) {
+            trimmed = trimmed.substring(1);
+        }
+
+        String[] parts = trimmed.split("\\s+");
+        if (parts.length >= 3 && parts[0].equalsIgnoreCase("give")) {
+            String item = parts[2].replace("%player%", "@p");
+            int amount = 1;
+            if (parts.length >= 4) {
+                try {
+                    amount = Integer.parseInt(parts[3]);
+                } catch (NumberFormatException ignored) {
+                    amount = 1;
+                }
+            }
+            return item + "/" + amount;
+        }
+
+        String main = parts[0];
+        if (parts.length > 1) {
+            return main + " " + parts[1].replace("%player%", "@p");
+        }
+        return main;
+    }
+
     @Override
     public Inventory createMailbox(Player viewer) {
         int size = config().getInt("gui.main.size");
@@ -112,25 +244,11 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
 
         List<ItemStack> items = plugin.getMailRepository().loadMailItems(mailId);
-        if (isEnabled("gui.sent-mail-view.items.items-display")) {
-            List<Integer> itemSlots = config().getIntegerList("gui.sent-mail-view.items.items-display.slots");
-            for (int i = 0; i < Math.min(items.size(), itemSlots.size()); i++) {
-                inv.setItem(itemSlots.get(i), items.get(i));
-            }
-        }
-
-        List<String> commands = record.commands();
-        if (!commands.isEmpty() && isEnabled("gui.sent-mail-view.items.command-block")) {
-            String serialized = record.commandBlock();
-            ItemStack commandBlock = serialized != null ? ItemSerialization.deserializeItem(serialized)
-                    : createDefaultCommandBlock();
-            if (commandBlock != null) {
-                ItemMeta commandMeta = commandBlock.getItemMeta();
-                commandMeta.setLore(new ArrayList<>());
-                commandBlock.setItemMeta(commandMeta);
-                inv.setItem(config().getInt("gui.sent-mail-view.items.command-block.slot"), commandBlock);
-            }
-        }
+        placeItemsAndCommands(inv,
+                items,
+                record.commands(),
+                "gui.sent-mail-view.items.items-display",
+                "gui.sent-mail-view.items.command-item");
 
         if (viewer.hasPermission(config().getString("settings.permissions.delete"))
                 && isEnabled("gui.sent-mail-view.items.delete-button")) {
@@ -191,31 +309,11 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
 
         List<ItemStack> items = plugin.getMailRepository().loadMailItems(mailId);
-        if (isEnabled("gui.mail-view.items.items-display")) {
-            List<Integer> itemSlots = config().getIntegerList("gui.mail-view.items.items-display.slots");
-            for (int i = 0; i < Math.min(items.size(), itemSlots.size()); i++) {
-                inv.setItem(itemSlots.get(i), items.get(i));
-            }
-        }
-
-        List<String> commands = record.commands();
-        if (!commands.isEmpty() && isEnabled("gui.mail-view.items.command-block")) {
-            String serialized = record.commandBlock();
-            ItemStack commandBlock = serialized != null ? ItemSerialization.deserializeItem(serialized)
-                    : new ItemStack(Material.COMMAND_BLOCK);
-            if (commandBlock != null) {
-                ItemMeta commandMeta = commandBlock.getItemMeta();
-                List<String> lore = new ArrayList<>();
-                lore.add(plugin.colorize(config().getString("messages.command-prefix")));
-                for (String command : commands) {
-                    lore.add(plugin.colorize(config().getString("messages.command-format-display")
-                            .replace("%command%", command)));
-                }
-                commandMeta.setLore(lore);
-                commandBlock.setItemMeta(commandMeta);
-                inv.setItem(config().getInt("gui.mail-view.items.command-block.slot"), commandBlock);
-            }
-        }
+        placeItemsAndCommands(inv,
+                items,
+                record.commands(),
+                "gui.mail-view.items.items-display",
+                "gui.mail-view.items.command-item");
 
         int claimSlot = config().getInt("gui.mail-view.items.claim-button.slot");
         if (isEnabled("gui.mail-view.items.claim-button")) {
