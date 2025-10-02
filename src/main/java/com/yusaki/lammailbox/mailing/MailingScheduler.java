@@ -13,7 +13,11 @@ import com.yusaki.lammailbox.service.MailDelivery;
 import com.yusaki.lammailbox.service.MailService;
 import com.yusaki.lammailbox.session.MailCreationSession;
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
+import org.bukkit.Registry;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -207,8 +211,19 @@ public final class MailingScheduler {
         MailCreationSession session = new MailCreationSession();
         session.setReceiver(receiver != null && !receiver.isBlank() ? receiver : "all");
         session.setMessage(definition.message());
-        session.setCommands(buildCommandList(definition));
-        session.setItems(Collections.emptyList());
+
+        // Convert item directives to actual ItemStacks
+        List<ItemStack> items = new ArrayList<>();
+        for (String directive : definition.itemDirectives()) {
+            ItemStack item = parseItemDirectiveToItemStack(directive);
+            if (item != null) {
+                items.add(item);
+            }
+        }
+        session.setItems(items);
+
+        // Only add actual commands, not converted items
+        session.setCommands(new ArrayList<>(definition.commands()));
 
         if (definition.expireDays() != null) {
             long expireAt = System.currentTimeMillis() + definition.expireDays() * 86_400_000L;
@@ -232,20 +247,90 @@ public final class MailingScheduler {
         }
     }
 
-    private List<String> buildCommandList(MailingDefinition definition) {
-        List<String> commands = new ArrayList<>(definition.commands());
-        for (String directive : definition.itemDirectives()) {
-            commands.add(buildGiveCommand(directive));
+    private ItemStack parseItemDirectiveToItemStack(String directive) {
+        if (directive == null || directive.isBlank()) {
+            return null;
         }
-        return commands;
+
+        String trimmed = directive.trim();
+        if (trimmed.startsWith("/")) {
+            trimmed = trimmed.substring(1).trim();
+        }
+
+        if (trimmed.toLowerCase(Locale.ROOT).startsWith("give ")) {
+            trimmed = trimmed.substring(4).trim();
+        }
+
+        String[] parts = trimmed.split("\\s+");
+        if (parts.length == 0) {
+            return null;
+        }
+
+        int index = 0;
+        if (parts[index].equalsIgnoreCase("%player%")
+                || parts[index].equalsIgnoreCase("@p")
+                || parts[index].equalsIgnoreCase("@s")) {
+            index++;
+        }
+
+        if (index >= parts.length) {
+            return null;
+        }
+
+        String materialToken = parts[index];
+        int nbtStart = materialToken.indexOf('{');
+        if (nbtStart >= 0) {
+            materialToken = materialToken.substring(0, nbtStart);
+        }
+
+        Material material = resolveMaterial(materialToken);
+        if (material == null) {
+            plugin.getLogger().warning("Invalid material in mailing item directive: " + directive);
+            return null;
+        }
+
+        index++;
+        // Extract amount
+        int amount = 1;
+        if (index < parts.length) {
+            String candidate = parts[index];
+            int braceIndex = candidate.indexOf('{');
+            if (braceIndex >= 0) {
+                candidate = candidate.substring(0, braceIndex);
+            }
+            if (!candidate.isEmpty()) {
+                try {
+                    amount = Integer.parseInt(candidate);
+                } catch (NumberFormatException ex) {
+                    plugin.getLogger().warning("Invalid amount in mailing item directive: " + directive + ". Using 1.");
+                    amount = 1;
+                }
+            }
+        }
+
+        if (amount <= 0) {
+            amount = 1;
+        }
+
+        return new ItemStack(material, amount);
     }
 
-    private String buildGiveCommand(String directive) {
-        String trimmed = directive.trim();
-        if (trimmed.toLowerCase(Locale.ROOT).startsWith("give ")) {
-            return trimmed.replace("{player}", "%player%").replace("${player}", "%player%");
+    private Material resolveMaterial(String token) {
+        String normalized = token.toLowerCase(Locale.ROOT);
+        NamespacedKey key = NamespacedKey.fromString(normalized);
+        if (key != null) {
+            Material material = Registry.MATERIAL.get(key);
+            if (material != null) {
+                return material;
+            }
         }
-        return "give %player% " + trimmed;
+
+        try {
+            return Material.valueOf(token.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+        }
+
+        return Material.matchMaterial(token, false);
     }
 
     private String resolveReceiver(String receiver) {
