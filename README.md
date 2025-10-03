@@ -3,13 +3,14 @@ LamMailBox lets admins deliver items and rich-text messages to players who donâ€
 ## Key Features
 
 * **Offline delivery**: Send mail and item attachments to any player, anytime. Items stay server-side until claimed.
-* **Command-friendly**: Use `/lmb send` directly or call it from other plugins to automate rewards, gifts, or event drops.
+* **Command-friendly**: Use `/lmb send` or trigger it from other plugins for instant rewards, gifts, or event drops.
 * **Simple GUI**: Players browse, read, and claim mail through an intuitive interface with inventory checks on pickup.
-* **Rich messages**: Supports colour codes and `\n` line breaks.
-* **Admin tools**: Optional console commands execute when mail is claimed. Schedule or expire mail using `YYYY:MM:DD:HH:mm`.
-* **Bulk targets**: `player1;player2`, `allonline` (current online players), or `all` (remains until everyone claims).
-* **Flexible storage**: Choose between YAML or SQLite backends. SQLite recommended for high-volume servers (1000+ mails).
-* **Notifications**: Chat, title, and sound alerts for new mail and join reminders.
+* **Rich messages**: Supports colour codes, `\n` line breaks, and unicode icons.
+* **Admin tools**: Attach console commands, schedule future deliveries, set expirations, or limit repeats via `max-runs`.
+* **Bulk targets**: `player1;player2`, `allonline` (snapshot of current players), or `all` (persistent for everyone).
+* **Automated mailings**: Cron-style repeating jobs and first-join bundles with catch-up when the server restarts.
+* **Flexible storage**: Choose between YAML or SQLite backends (SQLite recommended beyond ~1000 mails).
+* **Notifications**: Chat, title, and sound alerts for new mail plus join reminders.
 * **Folia/Paper ready**: Uses bundled FoliaLib scheduler for smooth cross-platform timing.
 
 ![main page](https://cdn.modrinth.com/data/cached_images/27a045c3d426870f8941d9d3ca1e7b0282d3a900_0.webp)
@@ -19,9 +20,6 @@ LamMailBox lets admins deliver items and rich-text messages to players who donâ€
 
 
 * No cross-server syncing or Bungee/Velocity support yet.
-* `allonline` sends only to players online at send time.
-* Mail files are plain text; staff can read or edit them.
-* Command attachments always run as console commandsâ€”review for security.
 
 ## Commands
 
@@ -32,6 +30,7 @@ LamMailBox lets admins deliver items and rich-text messages to players who donâ€
 | `/lmb view <id>`               | *(no permission)*        | View mail by ID (if you can access it) |
 | `/lmb as <player>`             | `lammailbox.view.as`     | View mail UI as another player   |
 | `/lmb send <player> <message>` | `lammailbox.admin`       | Send mail via command or console |
+| `/lmb mailings`                | `lammailbox.admin`       | View cron/first-join automation dashboard |
 | `/lmbreload`                   | `lammailbox.reload`      | Reload configuration files       |
 | `/lmbmigrate <from> <to>`      | `lammailbox.migrate`     | Migrate mail between storage backends (yaml/sqlite) |
 
@@ -48,9 +47,18 @@ LamMailBox lets admins deliver items and rich-text messages to players who donâ€
 ## Setup
 
 1. Drop the jar in `plugins/` and start the server to generate config/database files.
-2. Edit `plugins/LamMailBox/config.yml` to customize GUI text, slots, and notification settings. Set `enabled: false` on any button entry to remove it from the interface. Decoration fillers (new in v1.3.0) can also run console commands via the `commands` list, with `%player%` and `%uuid%` placeholders.
+2. Edit `plugins/LamMailBox/config.yml` to customize GUI text, slots, notification settings, and default expiry days. Set `enabled: false` on any button entry to remove it from the interface. Decoration fillers can run console commands via the `commands` list, with `%player%` and `%uuid%` placeholders.
 3. Grant the permissions that fit your ranks.
-4. Compose mail through the GUI or use `/lmb send` (or another plugin trigger) for automated deliveries.
+4. Compose mail through the GUI or use `/lmb send`; set up recurring deliveries in `mailings.yml` for cron or first-join workflows (`/lmb mailings` shows status).
+
+## Documentation
+
+Need examples or deeper guidance? Check the wiki:
+
+* **[Home](https://github.com/LamaliaNetwork/LamMailBox/wiki/Home)** â€“ overview and quick start.
+* **[Sending Mail](https://github.com/LamaliaNetwork/LamMailBox/wiki/Sending-Mail)** â€“ GUI walkthrough, command syntax, bulk targets, attachments.
+* **[Automated Mailings](https://github.com/LamaliaNetwork/LamMailBox/wiki/Automated-Mailings)** â€“ cron tips, scenario library, catch-up behaviour, `max-runs`.
+* **[Configuration](https://github.com/LamaliaNetwork/LamMailBox/wiki/Configuration)** â€“ notifications, storage backends, permissions, GUI theming links.
 
 ## Requirements
 
