@@ -1,4 +1,4 @@
-version: 1.5
+version: 1.6
 
 settings:
   max-mails-per-player: 54
@@ -196,6 +196,14 @@ gui:
         lore:
           - '&7Runs a server command when claimed.'
 
+      back-button:
+        enabled: true
+        material: ARROW
+        name: '&cʙᴀᴄᴋ'
+        lore:
+          - '&7Return to sent list'
+        slot: 36
+
       delete-button:
         enabled: true
         material: RED_TERRACOTTA
@@ -275,6 +283,14 @@ gui:
           - "&cᴇxᴘɪʀʏ ᴛɪᴍᴇ: &f%expire_time%"
         slot: 16
 
+      back-button:
+        enabled: true
+        material: ARROW
+        name: '&cʙᴀᴄᴋ'
+        lore:
+          - '&7Return to your mailbox'
+        slot: 18
+
       send-button:
         enabled: true
         material: GREEN_TERRACOTTA
@@ -286,6 +302,13 @@ gui:
     title: '&8ᴀᴅᴅ ɪᴛᴇᴍs'
     size: 27
     items:
+      back-button:
+        enabled: true
+        material: ARROW
+        name: '&cʙᴀᴄᴋ'
+        lore:
+          - '&7Return to compose menu'
+        slot: 18
       save-button:
         enabled: true
         material: GREEN_TERRACOTTA
@@ -414,6 +437,14 @@ gui:
         name: '&6Console Action'
         lore:
           - '&7Executes when claimed'
+
+      back-button:
+        enabled: true
+        material: ARROW
+        name: '&cʙᴀᴄᴋ'
+        lore:
+          - '&7Return to mailbox'
+        slot: 36
 
       pagination:
         previous-button:

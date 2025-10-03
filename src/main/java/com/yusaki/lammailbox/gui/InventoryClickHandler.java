@@ -241,6 +241,16 @@ public class InventoryClickHandler implements MailInventoryHandler {
 
     private void handleSentMailViewClick(InventoryClickEvent event, Player player, ItemStack clicked) {
         event.setCancelled(true);
+        if (clicked != null && clicked.hasItemMeta()) {
+            ItemMeta meta = clicked.getItemMeta();
+            if (meta != null) {
+                String action = meta.getPersistentDataContainer().get(actionKey, PersistentDataType.STRING);
+                if ("sent-mail-view-back".equals(action)) {
+                    plugin.openSentMailGUI(player);
+                    return;
+                }
+            }
+        }
         if (executeDecorationCommand(event, player, clicked)) {
             return;
         }
@@ -265,6 +275,15 @@ public class InventoryClickHandler implements MailInventoryHandler {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null) {
             return;
+        }
+        ItemMeta meta = clicked.getItemMeta();
+        if (meta != null) {
+            String action = meta.getPersistentDataContainer().get(actionKey, PersistentDataType.STRING);
+            if ("create-back".equals(action)) {
+                plugin.getInMailCreation().put(p.getUniqueId(), true);
+                plugin.openMainGUI(p);
+                return;
+            }
         }
         if (executeDecorationCommand(event, p, clicked)) {
             return;
@@ -306,6 +325,19 @@ public class InventoryClickHandler implements MailInventoryHandler {
 
     private void handleItemsGuiClick(InventoryClickEvent event) {
         ItemStack clicked = event.getCurrentItem();
+        if (clicked != null && clicked.hasItemMeta()) {
+            ItemMeta meta = clicked.getItemMeta();
+            if (meta != null) {
+                String action = meta.getPersistentDataContainer().get(actionKey, PersistentDataType.STRING);
+                if ("items-back".equals(action)) {
+                    event.setCancelled(true);
+                    Player player = (Player) event.getWhoClicked();
+                    player.closeInventory();
+                    plugin.getFoliaLib().getScheduler().runNextTick(task -> plugin.openCreateMailGUI(player));
+                    return;
+                }
+            }
+        }
         if (clicked != null && executeDecorationCommand(event, (Player) event.getWhoClicked(), clicked)) {
             return;
         }
@@ -444,9 +476,23 @@ public class InventoryClickHandler implements MailInventoryHandler {
         // Handle pagination FIRST (before decorations, as pagination buttons may have decoration tags)
         if (clicked != null && clicked.hasItemMeta()) {
             ItemMeta meta = clicked.getItemMeta();
-            String action = meta.getPersistentDataContainer().get(new NamespacedKey(plugin, "action"),
-                    PersistentDataType.STRING);
+            String action = meta.getPersistentDataContainer().get(actionKey, PersistentDataType.STRING);
             if (action != null) {
+                if ("mail-view-back".equals(action)) {
+                    String viewingAs = plugin.getViewingAsPlayer().get(player.getUniqueId());
+                    if (viewingAs != null) {
+                        Player target = Bukkit.getPlayerExact(viewingAs);
+                        if (target != null) {
+                            plugin.openMailboxAsPlayer(player, target);
+                        } else {
+                            plugin.getViewingAsPlayer().remove(player.getUniqueId());
+                            plugin.openMainGUI(player);
+                        }
+                    } else {
+                        plugin.openMainGUI(player);
+                    }
+                    return;
+                }
                 if (action.equals("page-prev") || action.equals("page-next")) {
                     String mailId = meta.getPersistentDataContainer().get(new NamespacedKey(plugin, "mailId"),
                             PersistentDataType.STRING);

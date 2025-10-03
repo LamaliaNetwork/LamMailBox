@@ -356,6 +356,38 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
     }
 
+    private void placeBackButton(Inventory inv, String path, String action) {
+        if (!isEnabled(path)) {
+            return;
+        }
+        String materialName = config().getString(path + ".material", "ARROW");
+        Material material = Material.matchMaterial(materialName);
+        if (material == null) {
+            material = Material.ARROW;
+        }
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+
+        String name = config().getString(path + ".name", "&cBack");
+        meta.setDisplayName(plugin.colorize(name));
+
+        List<String> lore = config().getStringList(path + ".lore").stream()
+                .map(plugin::colorize)
+                .collect(Collectors.toList());
+        if (!lore.isEmpty()) {
+            meta.setLore(lore);
+        }
+
+        meta.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, action);
+        applyItemMetaCustomizations(meta, path);
+        item.setItemMeta(meta);
+        int slot = config().getInt(path + ".slot", inv.getSize() - 1);
+        inv.setItem(slot, item);
+    }
+
 
     private Integer findAvailableSlot(Inventory inv,
                                       int preferred,
@@ -506,6 +538,8 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                 1,
                 slotsPerPage);
 
+        placeBackButton(inv, "gui.sent-mail-view.items.back-button", "sent-mail-view-back");
+
         if (viewer.hasPermission(config().getString("settings.permissions.delete"))
                 && isEnabled("gui.sent-mail-view.items.delete-button")) {
             ItemStack deleteButton = new ItemStack(Material.valueOf(config().getString("gui.sent-mail-view.items.delete-button.material")));
@@ -619,9 +653,12 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                     .collect(Collectors.toList()));
             dismissMeta.getPersistentDataContainer().set(mailIdKey,
                     PersistentDataType.STRING, mailId);
+            applyItemMetaCustomizations(dismissMeta, "gui.mail-view.items.dismiss-button");
             dismissButton.setItemMeta(dismissMeta);
             inv.setItem(dismissSlot, dismissButton);
         }
+
+        placeBackButton(inv, "gui.mail-view.items.back-button", "mail-view-back");
 
         return inv;
     }
@@ -737,6 +774,8 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             }
         }
 
+        placeBackButton(inv, "gui.create-mail.items.back-button", "create-back");
+
         return inv;
     }
 
@@ -757,9 +796,12 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             saveMeta.setLore(config().getStringList("gui.items.items.save-button.lore").stream()
                     .map(plugin::colorize)
                     .collect(Collectors.toList()));
+            applyItemMetaCustomizations(saveMeta, "gui.items.items.save-button");
             saveButton.setItemMeta(saveMeta);
             inv.setItem(config().getInt("gui.items.items.save-button.slot"), saveButton);
         }
+
+        placeBackButton(inv, "gui.items.items.back-button", "items-back");
         return inv;
     }
 
