@@ -19,6 +19,7 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.util.*;
 import java.util.Date;
+import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
@@ -29,12 +30,31 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
     private final NamespacedKey decorationKey;
     private final NamespacedKey commandItemIndexKey;
     private final NamespacedKey commandItemActionKey;
+    private final NamespacedKey actionKey;
+    private final NamespacedKey mailIdKey;
+    private final NamespacedKey paginationTargetKey;
 
     public ConfigMailGuiFactory(LamMailBox plugin) {
         this.plugin = plugin;
         this.decorationKey = new NamespacedKey(plugin, "decorationPath");
         this.commandItemIndexKey = new NamespacedKey(plugin, "commandItemIndex");
         this.commandItemActionKey = new NamespacedKey(plugin, "commandItemAction");
+        this.actionKey = new NamespacedKey(plugin, "action");
+        this.mailIdKey = new NamespacedKey(plugin, "mailId");
+        this.paginationTargetKey = new NamespacedKey(plugin, "paginationTarget");
+    }
+
+    private enum PaginationButtonType {
+        PREVIOUS,
+        NEXT,
+        INDICATOR
+    }
+
+    private record PaginationSettings(String basePath,
+                                       Set<Integer> reservedSlots,
+                                       String previousAction,
+                                       String nextAction,
+                                       BiConsumer<ItemMeta, PaginationButtonType> metaCustomizer) {
     }
 
     private ItemStack styledCommandIcon(String basePath, ItemStack existing, int commandCount, String summary) {
@@ -163,13 +183,6 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                                       int totalPages,
                                       Integer claimSlot,
                                       Integer dismissSlot) {
-        if (totalPages <= 1) {
-            // No pagination needed
-            return;
-        }
-
-        String basePath = "gui.mail-view.items.pagination";
-
         Set<Integer> reservedSlots = new HashSet<>();
         if (claimSlot != null) {
             reservedSlots.add(claimSlot);
@@ -178,76 +191,171 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             reservedSlots.add(dismissSlot);
         }
 
-        // Previous button
+        PaginationSettings settings = new PaginationSettings(
+                "gui.mail-view.items.pagination",
+                reservedSlots,
+                "page-prev",
+                "page-next",
+                (meta, type) -> {
+                    if (type != PaginationButtonType.INDICATOR) {
+                        meta.getPersistentDataContainer().set(mailIdKey, PersistentDataType.STRING, mailId);
+                    }
+                }
+        );
+
+        addPaginationButtons(inv, settings, currentPage, totalPages);
+    }
+
+    private void addPaginationButtons(Inventory inv,
+                                      PaginationSettings settings,
+                                      int currentPage,
+                                      int totalPages) {
+        if (totalPages <= 1) {
+            return;
+        }
+
+        String basePath = settings.basePath();
+        Set<Integer> reservedSlots = settings.reservedSlots() != null
+                ? new HashSet<>(settings.reservedSlots())
+                : new HashSet<>();
+
         if (isEnabled(basePath + ".previous-button") && currentPage > 1) {
-            int preferred = config().getInt(basePath + ".previous-button.slot", 36);
-            String materialName = config().getString(basePath + ".previous-button.material", "ARROW");
-            Material material = Material.matchMaterial(materialName);
-            if (material != null) {
-                ItemStack prevButton = new ItemStack(material);
-                ItemMeta meta = prevButton.getItemMeta();
-                if (meta != null) {
-                    String name = config().getString(basePath + ".previous-button.name", "&e← Previous");
-                    meta.setDisplayName(plugin.colorize(name));
-                    meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "mailId"),
-                            PersistentDataType.STRING, mailId);
-                    meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "action"),
-                            PersistentDataType.STRING, "page-prev");
-                    prevButton.setItemMeta(meta);
-                    Integer targetSlot = findAvailableSlot(inv, preferred, reservedSlots);
-                    if (targetSlot != null) {
-                        inv.setItem(targetSlot, prevButton);
-                    }
-                }
-            }
+            placePaginationButton(inv,
+                    basePath + ".previous-button",
+                    "ARROW",
+                    "&e← Previous",
+                    36,
+                    PaginationButtonType.PREVIOUS,
+                    currentPage,
+                    totalPages,
+                    settings.previousAction(),
+                    reservedSlots,
+                    settings.metaCustomizer());
         }
 
-        // Next button
         if (isEnabled(basePath + ".next-button") && currentPage < totalPages) {
-            int preferred = config().getInt(basePath + ".next-button.slot", 44);
-            String materialName = config().getString(basePath + ".next-button.material", "ARROW");
-            Material material = Material.matchMaterial(materialName);
-            if (material != null) {
-                ItemStack nextButton = new ItemStack(material);
-                ItemMeta meta = nextButton.getItemMeta();
-                if (meta != null) {
-                    String name = config().getString(basePath + ".next-button.name", "&eNext →");
-                    meta.setDisplayName(plugin.colorize(name));
-                    meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "mailId"),
-                            PersistentDataType.STRING, mailId);
-                    meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "action"),
-                            PersistentDataType.STRING, "page-next");
-                    nextButton.setItemMeta(meta);
-                    Integer targetSlot = findAvailableSlot(inv, preferred, reservedSlots);
-                    if (targetSlot != null) {
-                        inv.setItem(targetSlot, nextButton);
+            placePaginationButton(inv,
+                    basePath + ".next-button",
+                    "ARROW",
+                    "&eNext →",
+                    44,
+                    PaginationButtonType.NEXT,
+                    currentPage,
+                    totalPages,
+                    settings.nextAction(),
+                    reservedSlots,
+                    settings.metaCustomizer());
+        }
+
+        if (isEnabled(basePath + ".page-indicator")) {
+            placePaginationButton(inv,
+                    basePath + ".page-indicator",
+                    "BOOK",
+                    "&6Page %current%/%total%",
+                    40,
+                    PaginationButtonType.INDICATOR,
+                    currentPage,
+                    totalPages,
+                    null,
+                    reservedSlots,
+                    settings.metaCustomizer());
+        }
+    }
+
+    private void placePaginationButton(Inventory inv,
+                                       String path,
+                                       String defaultMaterial,
+                                       String defaultName,
+                                       int defaultSlot,
+                                       PaginationButtonType type,
+                                       int currentPage,
+                                       int totalPages,
+                                       String action,
+                                       Set<Integer> reservedSlots,
+                                       BiConsumer<ItemMeta, PaginationButtonType> metaCustomizer) {
+        int preferred = config().getInt(path + ".slot", defaultSlot);
+        String materialName = config().getString(path + ".material", defaultMaterial);
+        Material material = Material.matchMaterial(materialName);
+        if (material == null) {
+            return;
+        }
+
+        ItemStack button = new ItemStack(material);
+        ItemMeta meta = button.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+
+        String name = config().getString(path + ".name", defaultName);
+        if (name != null) {
+            if (type == PaginationButtonType.INDICATOR) {
+                name = name.replace("%current%", String.valueOf(currentPage))
+                        .replace("%total%", String.valueOf(totalPages));
+            }
+            meta.setDisplayName(plugin.colorize(name));
+        }
+
+        if (type != PaginationButtonType.INDICATOR && action != null) {
+            meta.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, action);
+        }
+
+        if (metaCustomizer != null) {
+            metaCustomizer.accept(meta, type);
+        }
+
+        applyItemMetaCustomizations(meta, path);
+        button.setItemMeta(meta);
+        Integer targetSlot = findAvailableSlot(inv, preferred, reservedSlots);
+        if (targetSlot != null) {
+            inv.setItem(targetSlot, button);
+        }
+    }
+
+
+    private void applyItemMetaCustomizations(ItemMeta meta, String basePath) {
+        if (meta == null || basePath == null || basePath.isEmpty()) {
+            return;
+        }
+
+        Object loreValue = config().get(basePath + ".lore");
+        List<String> loreLines = new ArrayList<>();
+        if (loreValue instanceof String singleLine && !singleLine.isBlank()) {
+            loreLines.add(singleLine);
+        } else if (loreValue instanceof Collection<?> collection) {
+            for (Object entry : collection) {
+                if (entry != null) {
+                    String line = entry.toString();
+                    if (!line.isBlank()) {
+                        loreLines.add(line);
                     }
                 }
             }
         }
+        if (!loreLines.isEmpty()) {
+            List<String> colorized = loreLines.stream()
+                    .map(plugin::colorize)
+                    .collect(Collectors.toList());
+            meta.setLore(colorized);
+        }
 
-        // Page indicator
-        if (isEnabled(basePath + ".page-indicator")) {
-            int preferred = config().getInt(basePath + ".page-indicator.slot", 40);
-            String materialName = config().getString(basePath + ".page-indicator.material", "BOOK");
-            Material material = Material.matchMaterial(materialName);
-            if (material != null) {
-                ItemStack indicator = new ItemStack(material);
-                ItemMeta meta = indicator.getItemMeta();
-                if (meta != null) {
-                    String name = config().getString(basePath + ".page-indicator.name", "&6Page %current%/%total%");
-                    name = name.replace("%current%", String.valueOf(currentPage))
-                            .replace("%total%", String.valueOf(totalPages));
-                    meta.setDisplayName(plugin.colorize(name));
-                    indicator.setItemMeta(meta);
-                    Integer targetSlot = findAvailableSlot(inv, preferred, reservedSlots);
-                    if (targetSlot != null) {
-                        inv.setItem(targetSlot, indicator);
-                    }
+        if (config().contains(basePath + ".custom-model-data")) {
+            Object rawValue = config().get(basePath + ".custom-model-data");
+            Integer customModelData = null;
+            if (rawValue instanceof Number number) {
+                customModelData = number.intValue();
+            } else if (rawValue instanceof String text && !text.isBlank()) {
+                try {
+                    customModelData = Integer.parseInt(text.trim());
+                } catch (NumberFormatException ignored) {
+                    customModelData = null;
                 }
+            }
+            if (customModelData != null) {
+                meta.setCustomModelData(customModelData);
             }
         }
     }
+
 
     private Integer findAvailableSlot(Inventory inv,
                                       int preferred,
@@ -406,7 +514,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             deleteMeta.setLore(config().getStringList("gui.sent-mail-view.items.delete-button.lore").stream()
                     .map(plugin::colorize)
                     .collect(Collectors.toList()));
-            deleteMeta.getPersistentDataContainer().set(new NamespacedKey(plugin, "mailId"),
+            deleteMeta.getPersistentDataContainer().set(mailIdKey,
                     PersistentDataType.STRING, mailId);
             deleteButton.setItemMeta(deleteMeta);
             inv.setItem(config().getInt("gui.sent-mail-view.items.delete-button.slot"), deleteButton);
@@ -496,7 +604,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             claimMeta.setLore(config().getStringList("gui.mail-view.items.claim-button.lore").stream()
                     .map(plugin::colorize)
                     .collect(Collectors.toList()));
-            claimMeta.getPersistentDataContainer().set(new NamespacedKey(plugin, "mailId"),
+            claimMeta.getPersistentDataContainer().set(mailIdKey,
                     PersistentDataType.STRING, mailId);
             claimButton.setItemMeta(claimMeta);
             inv.setItem(claimSlot, claimButton);
@@ -509,7 +617,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             dismissMeta.setLore(config().getStringList("gui.mail-view.items.dismiss-button.lore").stream()
                     .map(plugin::colorize)
                     .collect(Collectors.toList()));
-            dismissMeta.getPersistentDataContainer().set(new NamespacedKey(plugin, "mailId"),
+            dismissMeta.getPersistentDataContainer().set(mailIdKey,
                     PersistentDataType.STRING, mailId);
             dismissButton.setItemMeta(dismissMeta);
             inv.setItem(dismissSlot, dismissButton);
@@ -787,28 +895,65 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
 
         List<Integer> mailSlots = config().getIntegerList("gui.main.items.mail-display.slots");
+        if (mailSlots == null || mailSlots.isEmpty()) {
+            return;
+        }
+
+        String targetName = target.getName();
         List<MailRecord> records = plugin.getMailRepository().listMailIds().stream()
                 .map(id -> plugin.getMailRepository().findRecord(id).orElse(null))
                 .filter(Objects::nonNull)
                 .filter(MailRecord::active)
+                .filter(record -> record.canBeClaimedBy(targetName))
                 .sorted(Comparator.comparingLong(MailRecord::sentDate).reversed())
                 .collect(Collectors.toList());
 
-        String targetName = target.getName();
+        int slotsPerPage = mailSlots.size();
+        int totalPages = Math.max(1, (records.size() + slotsPerPage - 1) / slotsPerPage);
+        UUID viewerId = viewer.getUniqueId();
+        int currentPage = plugin.getMailboxPages().getOrDefault(viewerId, 1);
+        if (currentPage < 1) {
+            currentPage = 1;
+        }
+        if (currentPage > totalPages) {
+            currentPage = totalPages;
+        }
+        plugin.getMailboxPages().put(viewerId, currentPage);
+
+        int startIndex = (currentPage - 1) * slotsPerPage;
+        int endIndex = Math.min(records.size(), startIndex + slotsPerPage);
+
         int slotIndex = 0;
-        for (MailRecord record : records) {
-            if (slotIndex >= mailSlots.size()) {
-                break;
-            }
-            if (!record.canBeClaimedBy(targetName)) {
-                continue;
-            }
+        for (int i = startIndex; i < endIndex && slotIndex < mailSlots.size(); i++) {
+            MailRecord record = records.get(i);
             ItemStack mailItem = createMailItem(record);
             if (mailItem != null) {
                 inv.setItem(mailSlots.get(slotIndex), mailItem);
                 slotIndex++;
             }
         }
+
+        Set<Integer> reservedSlots = new HashSet<>();
+        if (isEnabled("gui.main.items.create-mail")) {
+            reservedSlots.add(config().getInt("gui.main.items.create-mail.slot"));
+        }
+        if (isEnabled("gui.main.items.sent-mail")) {
+            reservedSlots.add(config().getInt("gui.main.items.sent-mail.slot"));
+        }
+
+        PaginationSettings settings = new PaginationSettings(
+                "gui.main.items.pagination",
+                reservedSlots,
+                "mailbox-page-prev",
+                "mailbox-page-next",
+                (meta, type) -> {
+                    if (type != PaginationButtonType.INDICATOR) {
+                        meta.getPersistentDataContainer().set(paginationTargetKey, PersistentDataType.STRING, targetName);
+                    }
+                }
+        );
+
+        addPaginationButtons(inv, settings, currentPage, totalPages);
     }
 
     private void loadSentMails(Player viewer, Inventory inv) {
@@ -817,6 +962,10 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
 
         List<Integer> mailSlots = config().getIntegerList("gui.sent-mail.items.sent-mail-display.slots");
+        if (mailSlots == null || mailSlots.isEmpty()) {
+            return;
+        }
+
         String viewingAs = plugin.getViewingAsPlayer().get(viewer.getUniqueId());
         String targetPlayerName = viewingAs != null ? viewingAs : viewer.getName();
 
@@ -826,17 +975,49 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                 .sorted(Comparator.comparingLong(MailRecord::sentDate).reversed())
                 .collect(Collectors.toList());
 
+        int slotsPerPage = mailSlots.size();
+        int totalPages = Math.max(1, (records.size() + slotsPerPage - 1) / slotsPerPage);
+        UUID viewerId = viewer.getUniqueId();
+        int currentPage = plugin.getSentMailboxPages().getOrDefault(viewerId, 1);
+        if (currentPage < 1) {
+            currentPage = 1;
+        }
+        if (currentPage > totalPages) {
+            currentPage = totalPages;
+        }
+        plugin.getSentMailboxPages().put(viewerId, currentPage);
+
+        int startIndex = (currentPage - 1) * slotsPerPage;
+        int endIndex = Math.min(records.size(), startIndex + slotsPerPage);
+
         int slotIndex = 0;
-        for (MailRecord record : records) {
-            if (slotIndex >= mailSlots.size()) {
-                break;
-            }
+        for (int i = startIndex; i < endIndex && slotIndex < mailSlots.size(); i++) {
+            MailRecord record = records.get(i);
             ItemStack mailItem = createSentMailItem(record);
             if (mailItem != null) {
                 inv.setItem(mailSlots.get(slotIndex), mailItem);
                 slotIndex++;
             }
         }
+
+        Set<Integer> reservedSlots = new HashSet<>();
+        if (isEnabled("gui.sent-mail.items.back-button")) {
+            reservedSlots.add(config().getInt("gui.sent-mail.items.back-button.slot"));
+        }
+
+        PaginationSettings settings = new PaginationSettings(
+                "gui.sent-mail.items.pagination",
+                reservedSlots,
+                "sent-page-prev",
+                "sent-page-next",
+                (meta, type) -> {
+                    if (type != PaginationButtonType.INDICATOR) {
+                        meta.getPersistentDataContainer().set(paginationTargetKey, PersistentDataType.STRING, targetPlayerName);
+                    }
+                }
+        );
+
+        addPaginationButtons(inv, settings, currentPage, totalPages);
     }
 
     private ItemStack createMailItem(MailRecord record) {
@@ -870,7 +1051,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
 
         meta.setLore(lore);
-        meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "mailId"), PersistentDataType.STRING, record.id());
+        meta.getPersistentDataContainer().set(mailIdKey, PersistentDataType.STRING, record.id());
         mailItem.setItemMeta(meta);
         return mailItem;
     }
@@ -900,7 +1081,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                         .replace("%expire%", formatDate(expireAt))))
                 .collect(Collectors.toList());
         meta.setLore(lore);
-        meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "mailId"), PersistentDataType.STRING, record.id());
+        meta.getPersistentDataContainer().set(mailIdKey, PersistentDataType.STRING, record.id());
         item.setItemMeta(meta);
         return item;
     }

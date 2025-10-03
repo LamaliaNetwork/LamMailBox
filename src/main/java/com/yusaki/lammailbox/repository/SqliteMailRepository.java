@@ -78,9 +78,12 @@ public class SqliteMailRepository implements MailRepository {
                     "display_name TEXT," +
                     "lore TEXT," +
                     "commands TEXT," +
+                    "custom_model_data INTEGER," +
                     "PRIMARY KEY (mail_id, ordinal)," +
                     "FOREIGN KEY (mail_id) REFERENCES mail(mail_id) ON DELETE CASCADE" +
                     ")");
+
+            addColumnIfAbsent(connection, "mail_command_items", "custom_model_data", "INTEGER");
 
             statement.executeUpdate("CREATE TABLE IF NOT EXISTS mail_items (" +
                     "mail_id TEXT NOT NULL," +
@@ -321,8 +324,8 @@ public class SqliteMailRepository implements MailRepository {
         }
 
         try (PreparedStatement insert = connection.prepareStatement(
-                "INSERT INTO mail_command_items (mail_id, ordinal, material, display_name, lore, commands) " +
-                        "VALUES (?, ?, ?, ?, ?, ?)")) {
+                "INSERT INTO mail_command_items (mail_id, ordinal, material, display_name, lore, commands, custom_model_data) " +
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)")) {
             for (int i = 0; i < commandItems.size(); i++) {
                 Map<String, Object> item = commandItems.get(i);
                 insert.setString(1, mailId);
@@ -331,6 +334,12 @@ public class SqliteMailRepository implements MailRepository {
                 insert.setString(4, nullableString(item.get("name")));
                 insert.setString(5, joinList(asStringList(item.get("lore"))));
                 insert.setString(6, joinList(asStringList(item.get("commands"))));
+                Integer customModel = toNullableInteger(item.get("custom-model-data"));
+                if (customModel != null) {
+                    insert.setInt(7, customModel);
+                } else {
+                    insert.setNull(7, Types.INTEGER);
+                }
                 insert.addBatch();
             }
             insert.executeBatch();
@@ -367,7 +376,7 @@ public class SqliteMailRepository implements MailRepository {
 
     private List<Map<String, Object>> loadCommandItems(Connection connection, String mailId) throws SQLException {
         List<Map<String, Object>> items = new ArrayList<>();
-        String sql = "SELECT material, display_name, lore, commands FROM mail_command_items WHERE mail_id = ? ORDER BY ordinal";
+        String sql = "SELECT material, display_name, lore, commands, custom_model_data FROM mail_command_items WHERE mail_id = ? ORDER BY ordinal";
         try (PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, mailId);
             try (ResultSet rs = statement.executeQuery()) {
@@ -377,6 +386,10 @@ public class SqliteMailRepository implements MailRepository {
                     item.put("name", rs.getString("display_name"));
                     item.put("lore", splitString(rs.getString("lore")));
                     item.put("commands", splitString(rs.getString("commands")));
+                    Integer customModel = getNullableInteger(rs, "custom_model_data");
+                    if (customModel != null) {
+                        item.put("custom-model-data", customModel);
+                    }
                     items.add(item);
                 }
             }
@@ -642,6 +655,32 @@ public class SqliteMailRepository implements MailRepository {
         return list;
     }
 
+    private void addColumnIfAbsent(Connection connection, String table, String column, String definition) {
+        try {
+            if (columnExists(connection, table, column)) {
+                return;
+            }
+            try (Statement statement = connection.createStatement()) {
+                statement.executeUpdate("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().warning("Failed to add column " + column + " to table " + table + ": " + e.getMessage());
+        }
+    }
+
+    private boolean columnExists(Connection connection, String table, String column) throws SQLException {
+        try (Statement statement = connection.createStatement();
+             ResultSet rs = statement.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rs.next()) {
+                String name = rs.getString("name");
+                if (name != null && name.equalsIgnoreCase(column)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     private static String nullableString(Object value) {
         if (value == null) {
             return null;
@@ -650,8 +689,31 @@ public class SqliteMailRepository implements MailRepository {
         return str.isEmpty() ? null : str;
     }
 
+    private static Integer toNullableInteger(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String text) {
+            String trimmed = text.trim();
+            if (trimmed.isEmpty()) {
+                return null;
+            }
+            try {
+                return Integer.parseInt(trimmed);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
     private static Long getNullableLong(ResultSet rs, String column) throws SQLException {
         long value = rs.getLong(column);
+        return rs.wasNull() ? null : value;
+    }
+
+    private static Integer getNullableInteger(ResultSet rs, String column) throws SQLException {
+        int value = rs.getInt(column);
         return rs.wasNull() ? null : value;
     }
 }

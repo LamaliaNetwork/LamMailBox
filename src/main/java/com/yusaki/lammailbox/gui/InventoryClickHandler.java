@@ -17,18 +17,23 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class InventoryClickHandler implements MailInventoryHandler {
     private final LamMailBox plugin;
     private final NamespacedKey decorationKey;
     private final NamespacedKey commandItemIndexKey;
     private final NamespacedKey commandItemActionKey;
+    private final NamespacedKey actionKey;
+    private final NamespacedKey paginationTargetKey;
 
     public InventoryClickHandler(LamMailBox plugin) {
         this.plugin = plugin;
         this.decorationKey = new NamespacedKey(plugin, "decorationPath");
         this.commandItemIndexKey = new NamespacedKey(plugin, "commandItemIndex");
         this.commandItemActionKey = new NamespacedKey(plugin, "commandItemAction");
+        this.actionKey = new NamespacedKey(plugin, "action");
+        this.paginationTargetKey = new NamespacedKey(plugin, "paginationTarget");
     }
 
 
@@ -96,7 +101,40 @@ public class InventoryClickHandler implements MailInventoryHandler {
         String mainViewingPrefix = plugin.colorize(config().getString("gui.main.title") + " &7(as ");
         boolean isMainGUI = title.equals(mainTitle) || title.startsWith(mainViewingPrefix);
         if (isMainGUI) {
-            plugin.getViewingAsPlayer().remove(playerId);
+            UUID capturedId = playerId;
+            plugin.getFoliaLib().getScheduler().runNextTick(task -> {
+                if (!player.isOnline()) {
+                    plugin.getViewingAsPlayer().remove(capturedId);
+                    plugin.getMailboxPages().remove(capturedId);
+                    return;
+                }
+
+                String currentTitle = player.getOpenInventory().getTitle();
+                boolean stillMain = currentTitle.equals(mainTitle) || currentTitle.startsWith(mainViewingPrefix);
+                if (!stillMain) {
+                    plugin.getViewingAsPlayer().remove(capturedId);
+                    plugin.getMailboxPages().remove(capturedId);
+                }
+            });
+        }
+
+        String sentTitle = plugin.colorize(config().getString("gui.sent-mail.title"));
+        String sentViewingPrefix = plugin.colorize(config().getString("gui.sent-mail.title") + " &7(as ");
+        boolean isSentGUI = title.equals(sentTitle) || title.startsWith(sentViewingPrefix);
+        if (isSentGUI) {
+            UUID capturedId = playerId;
+            plugin.getFoliaLib().getScheduler().runNextTick(task -> {
+                if (!player.isOnline()) {
+                    plugin.getSentMailboxPages().remove(capturedId);
+                    return;
+                }
+
+                String currentTitle = player.getOpenInventory().getTitle();
+                boolean stillSent = currentTitle.equals(sentTitle) || currentTitle.startsWith(sentViewingPrefix);
+                if (!stillSent) {
+                    plugin.getSentMailboxPages().remove(capturedId);
+                }
+            });
         }
 
         // Reset mail view pagination after we confirm the player is no longer in the mail view
@@ -119,6 +157,18 @@ public class InventoryClickHandler implements MailInventoryHandler {
 
     private void handleMainGuiClick(InventoryClickEvent event, Player player, ItemStack clicked) {
         event.setCancelled(true);
+        if (clicked != null && clicked.hasItemMeta()) {
+            ItemMeta meta = clicked.getItemMeta();
+            String action = meta.getPersistentDataContainer().get(actionKey, PersistentDataType.STRING);
+            if (action != null && (action.equals("mailbox-page-prev") || action.equals("mailbox-page-next"))) {
+                String targetName = meta.getPersistentDataContainer().get(paginationTargetKey, PersistentDataType.STRING);
+                if (targetName == null || targetName.isBlank()) {
+                    targetName = player.getName();
+                }
+                handleMailboxPageNavigation(player, targetName, action.equals("mailbox-page-next"));
+                return;
+            }
+        }
         if (executeDecorationCommand(event, player, clicked)) {
             return;
         }
@@ -149,6 +199,18 @@ public class InventoryClickHandler implements MailInventoryHandler {
 
     private void handleSentMailGuiClick(InventoryClickEvent event, Player player, ItemStack clicked) {
         event.setCancelled(true);
+        if (clicked != null && clicked.hasItemMeta()) {
+            ItemMeta meta = clicked.getItemMeta();
+            String action = meta.getPersistentDataContainer().get(actionKey, PersistentDataType.STRING);
+            if (action != null && (action.equals("sent-page-prev") || action.equals("sent-page-next"))) {
+                String targetName = meta.getPersistentDataContainer().get(paginationTargetKey, PersistentDataType.STRING);
+                if (targetName == null || targetName.isBlank()) {
+                    targetName = player.getName();
+                }
+                handleSentMailboxPageNavigation(player, targetName, action.equals("sent-page-next"));
+                return;
+            }
+        }
         if (executeDecorationCommand(event, player, clicked)) {
             return;
         }
@@ -409,6 +471,65 @@ public class InventoryClickHandler implements MailInventoryHandler {
                 handleMailClaim(player, mailId);
             }
         }
+    }
+
+    private void handleMailboxPageNavigation(Player player, String targetName, boolean isNext) {
+        UUID viewerId = player.getUniqueId();
+        List<Integer> slots = config().getIntegerList("gui.main.items.mail-display.slots");
+        int slotsPerPage = (slots != null && !slots.isEmpty()) ? slots.size() : 21;
+
+        List<MailRecord> records = plugin.getMailRepository().listMailIds().stream()
+                .map(id -> plugin.getMailRepository().findRecord(id).orElse(null))
+                .filter(Objects::nonNull)
+                .filter(MailRecord::active)
+                .filter(record -> record.canBeClaimedBy(targetName))
+                .sorted(Comparator.comparingLong(MailRecord::sentDate).reversed())
+                .collect(Collectors.toList());
+
+        int totalPages = Math.max(1, (records.size() + slotsPerPage - 1) / slotsPerPage);
+        int currentPage = plugin.getMailboxPages().getOrDefault(viewerId, 1);
+        int newPage = isNext ? currentPage + 1 : currentPage - 1;
+        newPage = Math.max(1, Math.min(totalPages, newPage));
+        if (newPage == currentPage) {
+            return;
+        }
+
+        plugin.getMailboxPages().put(viewerId, newPage);
+
+        if (!targetName.equalsIgnoreCase(player.getName())) {
+            Player target = Bukkit.getPlayerExact(targetName);
+            if (target != null) {
+                plugin.openMailboxAsPlayer(player, target);
+            } else {
+                plugin.getViewingAsPlayer().remove(viewerId);
+                plugin.openMainGUI(player);
+            }
+        } else {
+            plugin.openMainGUI(player);
+        }
+    }
+
+    private void handleSentMailboxPageNavigation(Player player, String targetName, boolean isNext) {
+        UUID viewerId = player.getUniqueId();
+        List<Integer> slots = config().getIntegerList("gui.sent-mail.items.sent-mail-display.slots");
+        int slotsPerPage = (slots != null && !slots.isEmpty()) ? slots.size() : 21;
+
+        List<MailRecord> records = plugin.getMailRepository().listMailIdsBySender(targetName).stream()
+                .map(id -> plugin.getMailRepository().findRecord(id).orElse(null))
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparingLong(MailRecord::sentDate).reversed())
+                .collect(Collectors.toList());
+
+        int totalPages = Math.max(1, (records.size() + slotsPerPage - 1) / slotsPerPage);
+        int currentPage = plugin.getSentMailboxPages().getOrDefault(viewerId, 1);
+        int newPage = isNext ? currentPage + 1 : currentPage - 1;
+        newPage = Math.max(1, Math.min(totalPages, newPage));
+        if (newPage == currentPage) {
+            return;
+        }
+
+        plugin.getSentMailboxPages().put(viewerId, newPage);
+        plugin.openSentMailGUI(player);
     }
 
     private void handlePageNavigation(Player player, String mailId, boolean isNext) {

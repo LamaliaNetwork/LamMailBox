@@ -12,7 +12,8 @@ mailings:
   # items: List of item directives converted directly into ItemStacks (supports namespace ids).
   # commands: Console commands executed when the mail is claimed (supports %player% placeholder).
   # command-items: Preferred way to define console actions; each entry mirrors the GUI command bundles
-  #                (material, display name, lore, commands) and is shown in the mail view.
+  #                (material, display name, lore, commands, custom-model-data) and is shown in the mail view.
+  #                `custom-model-data` is optional and lets you match resource-pack overrides.
   # schedule:
   #   For FIRST_JOIN:
   #     delay-minutes / delay-seconds (optional) -> wait before delivering after first join.
@@ -74,6 +75,7 @@ mailings:
     sender: "Console"
     command-items:
       - material: CHEST
+        # custom-model-data: 1234567
         name: "&6Starter Bundle"
         lore:
           - "&7Runs multiple console actions"

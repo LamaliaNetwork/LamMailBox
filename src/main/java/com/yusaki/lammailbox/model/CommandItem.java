@@ -23,12 +23,14 @@ public final class CommandItem {
     private final String displayName;
     private final List<String> lore;
     private final List<String> commands;
+    private final Integer customModelData;
 
     private CommandItem(Builder builder) {
         this.materialKey = builder.materialKey;
         this.displayName = builder.displayName;
         this.lore = Collections.unmodifiableList(new ArrayList<>(builder.lore));
         this.commands = Collections.unmodifiableList(new ArrayList<>(builder.commands));
+        this.customModelData = builder.customModelData;
     }
 
     public String materialKey() {
@@ -45,6 +47,10 @@ public final class CommandItem {
 
     public List<String> commands() {
         return commands;
+    }
+
+    public Integer customModelData() {
+        return customModelData;
     }
 
     public ItemStack toPreviewItem(LamMailBox plugin) {
@@ -66,6 +72,9 @@ public final class CommandItem {
                     .map(plugin::colorize)
                     .toList();
             meta.setLore(loreLines);
+            if (customModelData != null) {
+                meta.setCustomModelData(customModelData);
+            }
             stack.setItemMeta(meta);
         }
         return stack;
@@ -77,6 +86,9 @@ public final class CommandItem {
         map.put("name", displayName);
         map.put("lore", new ArrayList<>(lore));
         map.put("commands", new ArrayList<>(commands));
+        if (customModelData != null) {
+            map.put("custom-model-data", customModelData);
+        }
         return map;
     }
 
@@ -113,6 +125,17 @@ public final class CommandItem {
             }
         }
 
+        Object customModelData = map.get("custom-model-data");
+        if (customModelData instanceof Number number) {
+            builder.customModelData(number.intValue());
+        } else if (customModelData instanceof String value) {
+            try {
+                builder.customModelData(Integer.parseInt(value.trim()));
+            } catch (NumberFormatException ignored) {
+                // ignore invalid string
+            }
+        }
+
         return builder.build();
     }
 
@@ -130,6 +153,7 @@ public final class CommandItem {
         builder.displayName(this.displayName);
         builder.lore.addAll(this.lore);
         builder.commands.addAll(this.commands);
+        builder.customModelData(this.customModelData);
         return builder;
     }
 
@@ -153,6 +177,7 @@ public final class CommandItem {
         private String displayName = "&6Command Item";
         private final List<String> lore = new ArrayList<>();
         private final List<String> commands = new ArrayList<>();
+        private Integer customModelData;
 
         public Builder material(String materialKey) {
             if (materialKey != null && !materialKey.isBlank()) {
@@ -238,6 +263,15 @@ public final class CommandItem {
 
         public String displayName() {
             return displayName;
+        }
+
+        public Integer customModelData() {
+            return customModelData;
+        }
+
+        public Builder customModelData(Integer customModelData) {
+            this.customModelData = customModelData;
+            return this;
         }
 
         public CommandItem build() {

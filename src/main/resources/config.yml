@@ -1,4 +1,4 @@
-version: 1.4
+version: 1.5
 
 settings:
   max-mails-per-player: 54
@@ -29,6 +29,7 @@ mailings:
   auto-cleanup: true
 
 gui:
+  # Any GUI item or decoration may define `custom-model-data` to override the rendered model.
   main:
     title: '&8ᴍᴀɪʟʙᴏx'
     size: 45
@@ -37,6 +38,7 @@ gui:
       # - enabled: false to hide the filler.
       # - lore: list of hover lines (color codes allowed).
       # - command / commands: console command(s) run on click (%player%, %uuid%).
+      # - custom-model-data: numeric override for resource-pack models.
       border:
         enabled: true
         material: BLACK_STAINED_GLASS_PANE
@@ -83,7 +85,26 @@ gui:
         lore:
           - '&7ᴄʟɪᴄᴋ ᴛᴏ ᴠɪᴇᴡ'
           - '&cᴇxᴘɪʀᴇs: &f%expire_date%'
-        slots: [10,11,12,13,14,15,16,19,20,21,22,23,24,25,28,29,30,31,32,33,34,37,38,39,40,41,42]
+        slots: [10,11,12,13,14,15,16,19,20,21,22,23,24,25,28,29,30,31,32,33,34]
+
+      pagination:
+        previous-button:
+          enabled: true
+          material: ARROW
+          name: '&e← Previous'
+          slot: 39
+
+        next-button:
+          enabled: true
+          material: ARROW
+          name: '&eNext →'
+          slot: 41
+
+        page-indicator:
+          enabled: true
+          material: BOOK
+          name: '&6Page %current%/%total%'
+          slot: 40
 
   sent-mail:
     title: '&8sᴇɴᴛ ᴍᴀɪʟ'
@@ -93,6 +114,7 @@ gui:
       # - enabled: false to hide the filler.
       # - lore: list of hover lines (colour codes allowed).
       # - command / commands: console command(s) run on click (%player%, %uuid%).
+      # - custom-model-data: numeric override for resource-pack models.
       border:
         enabled: true
         material: BLACK_STAINED_GLASS_PANE
@@ -117,6 +139,25 @@ gui:
           - '&7sᴇɴᴛ: &f%sent_date%'
         slots: [10,11,12,13,14,15,16,19,20,21,22,23,24,25,28,29,30,31,32,33,34]
 
+      pagination:
+        previous-button:
+          enabled: true
+          material: ARROW
+          name: '&e← Previous'
+          slot: 0
+
+        next-button:
+          enabled: true
+          material: ARROW
+          name: '&eNext →'
+          slot: 8
+
+        page-indicator:
+          enabled: true
+          material: BOOK
+          name: '&6Page %current%/%total%'
+          slot: 4
+
   sent-mail-view:
     title: "&8ᴠɪᴇᴡɪɴɢ sᴇɴᴛ ᴍᴀɪʟ"
     size: 45
@@ -125,6 +166,7 @@ gui:
       # - enabled: false to hide the filler.
       # - lore: list of hover lines (colour codes allowed).
       # - command / commands: console command(s) run on click (%player%, %uuid%).
+      # - custom-model-data: numeric override for resource-pack models.
       border:
         enabled: true
         material: BLACK_STAINED_GLASS_PANE
@@ -171,6 +213,7 @@ gui:
       # - enabled: false to hide the filler.
       # - lore: list of hover lines (colour codes allowed).
       # - command / commands: console command(s) run on click (%player%, %uuid%).
+      # - custom-model-data: numeric override for resource-pack models.
       border:
         enabled: true
         material: BLACK_STAINED_GLASS_PANE
@@ -342,6 +385,7 @@ gui:
       # - enabled: false to hide the filler.
       # - lore: list of hover lines (colour codes allowed).
       # - command / commands: console command(s) run on click (%player%, %uuid%).
+      # - custom-model-data: numeric override for resource-pack models.
       border:
         enabled: true
         material: BLACK_STAINED_GLASS_PANE
