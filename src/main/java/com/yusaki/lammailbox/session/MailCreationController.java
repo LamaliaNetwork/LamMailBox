@@ -1,6 +1,8 @@
 package com.yusaki.lammailbox.session;
 
 import com.yusaki.lammailbox.LamMailBox;
+import com.yusaki.lammailbox.model.CommandItem;
+import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
@@ -19,8 +21,10 @@ public class MailCreationController {
 
     public void showInputTitle(Player player, String type) {
         String path = "titles.input." + type;
-        String title = plugin.colorize(config().getString(path + ".title"));
-        String subtitle = plugin.colorize(config().getString(path + ".subtitle"));
+        String rawTitle = config().getString(path + ".title", config().getString("titles.input.command.title"));
+        String rawSubtitle = config().getString(path + ".subtitle", config().getString("titles.input.command.subtitle"));
+        String title = plugin.colorize(rawTitle != null ? rawTitle : "");
+        String subtitle = plugin.colorize(rawSubtitle != null ? rawSubtitle : "");
         int fadeIn = config().getInt("titles.input.fadein");
         int stay = config().getInt("titles.input.stay");
         int fadeOut = config().getInt("titles.input.fadeout");
@@ -74,6 +78,102 @@ public class MailCreationController {
         return true;
     }
 
+    public boolean handleCommandItemMaterialInput(Player player, String input, MailCreationSession session) {
+        CommandItem.Builder draft = ensureCommandItemDraft(session);
+        if (input == null || input.trim().isEmpty()) {
+            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.invalid-material")));
+            return false;
+        }
+
+        String trimmed = input.trim();
+        Material material = Material.matchMaterial(trimmed, false);
+        if (material == null) {
+            String upper = trimmed.toUpperCase(Locale.ROOT);
+            material = Material.matchMaterial(upper, false);
+        }
+        if (material == null && !trimmed.contains(":")) {
+            try {
+                material = Material.valueOf(trimmed.toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        if (material == null) {
+            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.invalid-material")));
+            return false;
+        }
+        draft.material(material.name());
+        player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-material-set", "&a✔ Material set to %material%")
+                .replace("%material%", material.name())));
+        return true;
+    }
+
+    public boolean handleCommandItemNameInput(Player player, String input, MailCreationSession session) {
+        CommandItem.Builder draft = ensureCommandItemDraft(session);
+        if (input == null || input.trim().isEmpty()) {
+            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-name-failed", "&c✖ Name update failed.")));
+            return false;
+        }
+        draft.displayName(input);
+        player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-name-set", "&a✔ Name updated.")));
+        return true;
+    }
+
+    public boolean handleCommandItemLoreInput(Player player, String input, MailCreationSession session) {
+        CommandItem.Builder draft = ensureCommandItemDraft(session);
+        String trimmed = input == null ? "" : input.trim();
+        if (trimmed.isEmpty()) {
+            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-lore-failed", "&c✖ Lore update failed")));
+            return false;
+        }
+        draft.addLoreLine(input);
+        player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-lore-added", "&a✔ Added lore line.")));
+        return true;
+    }
+
+    public boolean handleCommandItemCommandInput(Player player, String input, MailCreationSession session) {
+        CommandItem.Builder draft = ensureCommandItemDraft(session);
+        if (input == null || input.trim().isEmpty()) {
+            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-command-failed", "&c✖ Command update failed")));
+            return false;
+        }
+        String trimmed = input.startsWith("/") ? input.substring(1) : input;
+        draft.addCommand(trimmed);
+        player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-command-added", "&a✔ Added command.")));
+        return true;
+    }
+
+    public boolean finalizeCommandItem(Player player, MailCreationSession session) {
+        CommandItem.Builder draft = session.getCommandItemDraft();
+        if (draft == null) {
+            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-no-draft", "&c✖ Nothing to save.")));
+            return false;
+        }
+
+        if (draft.commands().isEmpty()) {
+            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-requires-command", "&c✖ Add at least one command.")));
+            return false;
+        }
+
+        CommandItem built = draft.build();
+        List<CommandItem> items = new ArrayList<>(session.getCommandItems());
+        Integer editIndex = session.getCommandItemEditIndex();
+        if (editIndex != null && editIndex >= 0 && editIndex < items.size()) {
+            items.set(editIndex, built);
+        } else {
+            items.add(built);
+        }
+        session.setCommandItems(items);
+        session.setCommandItemDraft(null);
+        session.setCommandItemEditIndex(null);
+        player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-saved", "&a✔ Command item saved!")));
+        return true;
+    }
+
+    public void cancelCommandItemEdit(MailCreationSession session) {
+        session.setCommandItemDraft(null);
+        session.setCommandItemEditIndex(null);
+    }
+
     public boolean handleDateInput(Player player, String input, MailCreationSession session, boolean isSchedule) {
         try {
             String[] parts = input.split(":");
@@ -120,7 +220,27 @@ public class MailCreationController {
         plugin.getFoliaLib().getScheduler().runNextTick(task -> plugin.openCreateMailGUI(player));
     }
 
+    public void reopenCommandItemCreatorAsync(Player player) {
+        if (player == null) {
+            return;
+        }
+        plugin.getFoliaLib().getScheduler().runNextTick(task -> plugin.openCommandItemCreator(player));
+    }
+
     private FileConfiguration config() {
         return plugin.getConfig();
+    }
+
+    private CommandItem.Builder ensureCommandItemDraft(MailCreationSession session) {
+        CommandItem.Builder draft = session.getCommandItemDraft();
+        if (draft == null) {
+            draft = new CommandItem.Builder();
+            session.setCommandItemDraft(draft);
+        }
+        return draft;
+    }
+
+    private String prefix() {
+        return config().getString("messages.prefix", "");
     }
 }

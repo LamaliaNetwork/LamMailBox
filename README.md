@@ -12,12 +12,29 @@ LamMailBox lets admins deliver items and rich-text messages to players who don�
 * **Flexible storage**: Choose between YAML or SQLite backends (SQLite recommended beyond ~1000 mails).
 * **Notifications**: Chat, title, and sound alerts for new mail plus join reminders.
 * **Folia/Paper ready**: Uses bundled FoliaLib scheduler for smooth cross-platform timing.
+* **Mailings dashboard**: `/lmb mailings` lists recurring jobs with status colors, run history, and human-readable schedules.
+
+## Mailings Command
+
+`/lmb mailings` shows every configured mailing job so you can audit schedules without opening configuration files.
+
+### Output at a glance
+
+- **Header** – configurable banner pulled from `messages.mailings.header`.
+- **Status** – green when enabled, red when disabled; formatting comes from `messages.mailings.status-enabled` / `status-disabled`.
+- **Schedule** – repeating mailings translate their cron expression to plain language (for example, "Every day at 02:00").
+- **Next / Last run** – timestamps generated from stored run data; missing values fall back to `messages.mailings.value-missing`.
+- **Runs** – whenever `max-runs` is set, the command displays the current count and highlights when the mailing has completed.
+- **First-join mailings** – flagged with a simplified template that keeps output tidy.
+
+### Customizing the layout
+
+All strings live under `messages.mailings` in `config.yml`, so you can localize the header, list templates, and fallback text. Reload the plugin (`/lmbreload`) after editing to pick up changes instantly.
 
 ![main page](https://cdn.modrinth.com/data/cached_images/27a045c3d426870f8941d9d3ca1e7b0282d3a900_0.webp)
 ![mail creation page](https://cdn.modrinth.com/data/cached_images/8f6c3a33f10f14d70cdd1221b8c5c716a071d9fb_0.webp)
 
 ## Limitations & Roadmap
-
 
 * No cross-server syncing or Bungee/Velocity support yet.
 

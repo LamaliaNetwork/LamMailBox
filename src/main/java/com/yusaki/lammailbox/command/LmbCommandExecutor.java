@@ -3,6 +3,7 @@ package com.yusaki.lammailbox.command;
 import com.yusaki.lammailbox.LamMailBox;
 import com.yusaki.lammailbox.mailing.MailingDefinition;
 import com.yusaki.lammailbox.mailing.MailingType;
+import com.yusaki.lammailbox.model.CommandItem;
 import com.yusaki.lammailbox.repository.MailRecord;
 import com.yusaki.lammailbox.service.MailDelivery;
 import com.yusaki.lammailbox.session.MailCreationSession;
@@ -132,6 +133,13 @@ public class LmbCommandExecutor implements CommandExecutor {
 
         session.setMessage(messageContent);
         session.setCommands(commands);
+        if (!commands.isEmpty()) {
+            CommandItem.Builder builder = new CommandItem.Builder()
+                    .material("COMMAND_BLOCK")
+                    .displayName("&6Console Actions")
+                    .setCommands(commands);
+            session.setCommandItems(Collections.singletonList(builder.build()));
+        }
 
         // Set schedule date if provided
         if (scheduleDate != null) {
@@ -288,45 +296,74 @@ public class LmbCommandExecutor implements CommandExecutor {
         }
 
         List<MailingDefinition> definitions = plugin.getMailingDefinitions();
+        String prefix = config.getString("messages.prefix", "");
+        String header = plugin.getMailingsMessage("header", "&6Mailings:");
+        String empty = plugin.getMailingsMessage("empty", "&7No mailings configured.");
         if (definitions.isEmpty()) {
-            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                    "&7No mailings configured."));
+            sender.sendMessage(plugin.colorize(prefix + empty));
             return true;
         }
 
-        sender.sendMessage(plugin.colorize(config.getString("messages.prefix") + "&6Mailings:"));
-        long now = System.currentTimeMillis();
+        sender.sendMessage(plugin.colorize(prefix + header));
         var statusRepository = plugin.getMailingStatusRepository();
         var scheduler = plugin.getMailingScheduler();
+        String repeatingTemplate = plugin.getMailingsMessage("entry-repeating",
+                "&e• &f%id% &8| %status% &8| &7Schedule: &f%schedule% &8| &7Next: &f%next% &8| &7Last: &f%last%%runs%%completed%");
+        String firstJoinTemplate = plugin.getMailingsMessage("entry-first-join",
+                "&e• &f%id% &8| %status% &8| &7Trigger: &fOn first join%completed%");
+        String runsTemplate = plugin.getMailingsMessage("runs", " &8| &7Runs: &f%current%&7/&f%max%");
+        String completedTemplate = plugin.getMailingsMessage("completed", " &8| &a✓ Completed");
+        String missingValue = plugin.getMailingsMessage("value-missing", "&7—");
+        String statusEnabled = plugin.getMailingsMessage("status-enabled", "&aEnabled");
+        String statusDisabled = plugin.getMailingsMessage("status-disabled", "&cDisabled");
         for (MailingDefinition definition : definitions) {
-            StringBuilder line = new StringBuilder();
-            line.append("&e").append(definition.id()).append(" &7[")
-                    .append(definition.type()).append("] ")
-                    .append(definition.enabled() ? "&aENABLED" : "&cDISABLED");
+            String statusText = definition.enabled() ? statusEnabled : statusDisabled;
 
-            switch (definition.type()) {
-                case REPEATING -> {
-                    if (definition.cronExpression() != null) {
-                        line.append(" &7cron=\"&f").append(definition.cronExpression()).append("&7\"");
-                    }
-                    long lastRun = statusRepository != null ? statusRepository.getLastRun(definition.id()) : 0L;
-                    if (lastRun > 0) {
-                        line.append(" &7last: &f").append(formatTime(lastRun));
-                    }
-                    OptionalLong nextRun = scheduler != null ? scheduler.previewNextRunEpoch(definition.id()) : OptionalLong.empty();
-                    nextRun.ifPresent(value -> line.append(" &7next: &f").append(formatTime(value)));
-                    if (definition.maxRuns() != null) {
-                        int runCount = statusRepository != null ? statusRepository.getRunCount(definition.id()) : 0;
-                        line.append(" &7runs: &f").append(runCount).append("/&f").append(definition.maxRuns());
-                        if (runCount >= definition.maxRuns()) {
-                            line.append(" &7(status: &acompleted&7)");
-                        }
+            String scheduleText = missingValue;
+            String nextText = missingValue;
+            String lastText = missingValue;
+            String runsSegment = "";
+            String completedSegment = "";
+
+            if (definition.type() == MailingType.REPEATING) {
+                String cronExpression = definition.cronExpression();
+                if (cronExpression != null && !cronExpression.isBlank()) {
+                    String described = plugin.describeCron(cronExpression);
+                    scheduleText = (described == null || described.isBlank()) ? cronExpression : described;
+                }
+
+                long lastRun = statusRepository != null ? statusRepository.getLastRun(definition.id()) : 0L;
+                if (lastRun > 0) {
+                    lastText = formatTime(lastRun);
+                }
+
+                OptionalLong nextRun = scheduler != null ? scheduler.previewNextRunEpoch(definition.id()) : OptionalLong.empty();
+                if (nextRun.isPresent()) {
+                    nextText = formatTime(nextRun.getAsLong());
+                }
+
+                if (definition.maxRuns() != null) {
+                    int runCount = statusRepository != null ? statusRepository.getRunCount(definition.id()) : 0;
+                    runsSegment = runsTemplate
+                            .replace("%current%", String.valueOf(runCount))
+                            .replace("%max%", String.valueOf(definition.maxRuns()));
+                    if (runCount >= definition.maxRuns()) {
+                        completedSegment = completedTemplate;
                     }
                 }
-                case FIRST_JOIN -> line.append(" &7-> &fOn first join");
             }
 
-            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") + line));
+            String template = definition.type() == MailingType.FIRST_JOIN ? firstJoinTemplate : repeatingTemplate;
+            String line = template
+                    .replace("%id%", definition.id())
+                    .replace("%status%", statusText)
+                    .replace("%schedule%", scheduleText)
+                    .replace("%next%", nextText)
+                    .replace("%last%", lastText)
+                    .replace("%runs%", runsSegment)
+                    .replace("%completed%", completedSegment);
+
+            sender.sendMessage(plugin.colorize(prefix + line));
         }
         return true;
     }

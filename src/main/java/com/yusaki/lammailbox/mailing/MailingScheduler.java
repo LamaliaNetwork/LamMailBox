@@ -12,6 +12,7 @@ import com.yusaki.lammailbox.mailing.status.MailingStatusRepository;
 import com.yusaki.lammailbox.service.MailDelivery;
 import com.yusaki.lammailbox.service.MailService;
 import com.yusaki.lammailbox.session.MailCreationSession;
+import com.yusaki.lammailbox.model.CommandItem;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -224,6 +225,7 @@ public final class MailingScheduler {
 
         // Only add actual commands, not converted items
         session.setCommands(new ArrayList<>(definition.commands()));
+        session.setCommandItems(new ArrayList<>(definition.commandItems()));
 
         if (definition.expireDays() != null) {
             long expireAt = System.currentTimeMillis() + definition.expireDays() * 86_400_000L;

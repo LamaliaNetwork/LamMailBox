@@ -1,4 +1,4 @@
-version: 1.3
+version: 1.4
 
 settings:
   max-mails-per-player: 54
@@ -147,14 +147,12 @@ gui:
         enabled: true
         slots: [10,11,12,13,14,15,16,19,20,21,22,23,24,25,28,29,30,31,32,33,34]
 
-      command-item:
+      command-legacy:
         enabled: true
         material: COMMAND_BLOCK
-        name: '&6Console Action #%index%'
+        name: '&6Console Action'
         lore:
-          - '&7Command: &f%summary%'
           - '&7Runs a server command when claimed.'
-          - '&7Total commands: &f%total%'
 
       delete-button:
         enabled: true
@@ -216,12 +214,10 @@ gui:
       command-block:
         enabled: true
         material: COMMAND_BLOCK
-        name: "&6ᴄᴏᴍᴍᴀɴᴅs"
+        name: "&6ᴄᴏᴍᴍᴀɴᴅ ɪᴛᴇᴍs"
         lore:
-          - "&7ʟᴇғᴛ-ᴄʟɪᴄᴋ ᴛᴏ ᴀᴅᴅ"
-          - "&7ʀɪɢʜᴛ-ᴄʟɪᴄᴋ ᴛᴏ ʀᴇᴍᴏᴠᴇ"
-        commands-prefix: "&bCommands:"
-        command-format: "&7⟫ /%command%"
+          - "&7ᴄʟɪᴄᴋ ᴛᴏ ᴍᴀɴᴀɢᴇ ᴀᴄᴛɪᴏɴs"
+          - "&7Configured: &f%count%"
         slot: 15
 
       schedule-clock:
@@ -255,6 +251,89 @@ gui:
           - '&7ᴄʟɪᴄᴋ ᴛᴏ sᴀᴠᴇ'
         slot: 26
 
+  command-items-editor:
+    title: '&8ᴄᴏᴍᴍᴀɴᴅ ɪᴛᴇᴍs'
+    size: 27
+    decoration:
+      border:
+        enabled: true
+        material: BLACK_STAINED_GLASS_PANE
+        name: ' '
+        slots: [0,1,2,3,4,5,6,7,8,9,17,18,19,20,21,22,23,26]
+    items:
+      command-item:
+        enabled: true
+        slots: [10,11,12,13,14,15,16]
+        command-header: '&7Commands:'
+        lore:
+          - '&7Left-click to edit'
+          - '&7Right-click to delete'
+      add-button:
+        enabled: true
+        material: LIME_STAINED_GLASS_PANE
+        name: '&a+ Add Command Item'
+        lore:
+          - '&7Create a new command action'
+        slot: 24
+      back-button:
+        enabled: true
+        material: ARROW
+        name: '&cBack to Mail Creation'
+        lore:
+          - '&7Return to compose menu'
+        slot: 25
+
+  command-item-creator:
+    title: '&8ᴄᴏᴍᴍᴀɴᴅ ɪᴛᴇᴍ ᴇᴅɪᴛᴏʀ'
+    size: 27
+    decoration:
+      border:
+        enabled: true
+        material: BLACK_STAINED_GLASS_PANE
+        name: ' '
+        slots: [0,1,2,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,25]
+    items:
+      material-selector:
+        enabled: true
+        material: IRON_INGOT
+        name: '&eSelect Material (&f%material%&e)'
+        lore:
+          - '&7Click to enter a material name'
+        slot: 10
+      name-editor:
+        enabled: true
+        material: NAME_TAG
+        name: '&bDisplay Name'
+        lore:
+          - '&7Current: &f%name%'
+          - '&7Click to edit via chat'
+        slot: 12
+      lore-editor:
+        enabled: true
+        material: WRITABLE_BOOK
+        name: '&dLore (&f%lore_count% &dlɪɴᴇs)'
+        lore:
+          - '&7Left-click to add line'
+          - '&7Right-click to remove last'
+        slot: 13
+      commands-editor:
+        enabled: true
+        material: COMMAND_BLOCK
+        name: '&6Commands (&f%command_count%&6)'
+        lore:
+          - '&7Left-click to add command'
+          - '&7Right-click to remove last'
+        slot: 14
+      preview:
+        slot: 16
+      save-button:
+        enabled: true
+        material: LIME_CONCRETE
+        name: '&aSave Command Item'
+        lore:
+          - '&7Store this command action'
+        slot: 26
+
   mail-view:
     title: "&8ᴠɪᴇᴡɪɴɢ ᴍᴀɪʟ"
     size: 45
@@ -285,10 +364,10 @@ gui:
         enabled: true
         slots: [10,11,12,13,14,15,16,19,20,21,22,23,24,25,28,29,30,31,32,33,34]
 
-      command-item:
+      command-legacy:
         enabled: true
         material: COMMAND_BLOCK
-        name: '&6Command'
+        name: '&6Console Action'
         lore:
           - '&7Executes when claimed'
 
@@ -330,6 +409,16 @@ gui:
 
 messages:
   prefix: '&8[&6✉ LamMailBox&8] '
+  mailings:
+    header: '&6✉ Scheduled Mailings'
+    empty: '&7No scheduled mailings configured.'
+    entry-repeating: '&e• &f%id% &8| %status% &8| &7Schedule: &f%schedule% &8| &7Next: &f%next% &8| &7Last: &f%last%%runs%%completed%'
+    entry-first-join: '&e• &f%id% &8| %status% &8| &7Trigger: &fOn first join%completed%'
+    runs: ' &8| &7Runs: &f%current%&7/&f%max%'
+    completed: ' &8| &a✓ Completed'
+    value-missing: '&7—'
+    status-enabled: '&aEnabled'
+    status-disabled: '&cDisabled'
   mailbox-full: '&c✖ This mailbox is full! Maximum capacity reached.'
   enter-receiver: '&e✎ Who would you like to send this mail to?'
   enter-message: '&e✎ Write your message below:'
@@ -341,6 +430,10 @@ messages:
   inventory-space-needed: '&c⚠ You need %amount% free inventory slots to claim these items!'
   items-claimed: '&a✔ Items claimed and added to your inventory!'
   enter-command: '&a⌘ Enter your command below (without the /)'
+  enter-command-item-material: '&eEnter item material (e.g., DIAMOND, EMERALD):'
+  enter-command-item-name: '&eEnter item display name (color codes supported):'
+  enter-command-item-lore: '&eEnter lore line. Right-click the lore button to remove the last entry.'
+  enter-command-item-command: '&eEnter command (without /). Right-click the command button to remove the last entry.'
   incomplete-mail: '&c⚠ Cannot send mail - some details are missing!'
   current-receiver: '&a✉ Sending to: &f%receiver%'
   current-message: '&a✎ Your message:'
@@ -358,6 +451,24 @@ messages:
   invalid-date-format: "&c✖ Invalid date! Use format: YYYY:MM:DD:HH:mm"
   schedule-set: "&a✔ Delivery scheduled for: %date%"
   expire-set: "&a✔ Mail will expire on: %date%"
+  invalid-material: '&c✖ Invalid material! Use valid Bukkit material names.'
+  command-item-material-set: '&a✔ Command item material updated.'
+  command-item-name-set: '&a✔ Display name updated.'
+  command-item-name-failed: '&c✖ Could not update display name.'
+  command-item-lore-finished: '&a✔ Lore editing complete.'
+  command-item-lore-cleared: '&a✔ Lore cleared.'
+  command-item-lore-added: '&a✔ Added lore line.'
+  command-item-lore-failed: '&c✖ Could not update lore.'
+  command-item-lore-removed: '&a✔ Removed last lore line.'
+  command-item-lore-empty: '&c✖ No lore lines to remove.'
+  command-item-command-finished: '&a✔ Command editing complete.'
+  command-item-command-removed: '&a✔ Removed last command.'
+  command-item-command-empty: '&c✖ No commands to remove.'
+  command-item-command-added: '&a✔ Added command.'
+  command-item-command-failed: '&c✖ Could not update commands.'
+  command-item-no-draft: '&c✖ Nothing to save.'
+  command-item-requires-command: '&c✖ Add at least one command before saving.'
+  command-item-saved: '&a✔ Command item saved!'
   self-mail: '&c✖ You cannot send mail to yourself!'
   reload-success: '&a✔ Configuration reloaded successfully!'
   no-items-in-mail: '&a✔ Mail marked as read.'
@@ -401,6 +512,18 @@ titles:
     command:
       title: "&6⌘ Add Command"
       subtitle: "&eType command without /"
+    command-item-material:
+      title: "&6⌘ Command Item Material"
+      subtitle: "&eEnter a Bukkit material (e.g., DIAMOND)"
+    command-item-name:
+      title: "&6⌘ Command Item Name"
+      subtitle: "&eProvide the display name"
+    command-item-lore:
+      title: "&6⌘ Command Item Lore"
+      subtitle: "&eEnter lore text"
+    command-item-command:
+      title: "&6⌘ Command Item Action"
+      subtitle: "&eEnter console command (no /)"
     schedule:
       title: "&6⏰ Schedule Delivery"
       subtitle: "&eFormat: YYYY:MM:DD:HH:mm"
