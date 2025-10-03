@@ -390,8 +390,23 @@ gui:
           - '&7Left-click to add command'
           - '&7Right-click to remove last'
         slot: 14
+      custom-model-editor:
+        enabled: true
+        material: GOLD_NUGGET
+        name: '&6Custom Model (&f%custom_model_data%&6)'
+        lore:
+          - '&7Left-click to set custom model data'
+          - '&7Right-click to clear'
+        slot: 15
       preview:
         slot: 16
+      back-button:
+        enabled: true
+        material: ARROW
+        name: '&cʙᴀᴄᴋ'
+        lore:
+          - '&7Return to actions list'
+        slot: 18
       save-button:
         enabled: true
         material: LIME_CONCRETE
@@ -509,6 +524,7 @@ messages:
   enter-command-item-name: '&eEnter item display name (color codes supported):'
   enter-command-item-lore: '&eEnter lore line. Right-click the lore button to remove the last entry.'
   enter-command-item-command: '&eEnter command (without /). Right-click the command button to remove the last entry.'
+  enter-command-item-custom-model: '&eEnter custom model data (number) or type CLEAR.'
   incomplete-mail: '&c⚠ Cannot send mail - some details are missing!'
   current-receiver: '&a✉ Sending to: &f%receiver%'
   current-message: '&a✎ Your message:'
@@ -541,6 +557,9 @@ messages:
   command-item-command-empty: '&c✖ No commands to remove.'
   command-item-command-added: '&a✔ Added command.'
   command-item-command-failed: '&c✖ Could not update commands.'
+  command-item-model-set: '&a✔ Custom model data set to &f%value%&a.'
+  command-item-model-cleared: '&a✔ Custom model data cleared.'
+  command-item-model-invalid: '&c✖ Invalid custom model data. Use a non-negative number or CLEAR.'
   command-item-no-draft: '&c✖ Nothing to save.'
   command-item-requires-command: '&c✖ Add at least one command before saving.'
   command-item-saved: '&a✔ Command item saved!'
@@ -599,6 +618,9 @@ titles:
     command-item-command:
       title: "&6⌘ Command Item Action"
       subtitle: "&eEnter console command (no /)"
+    command-item-custom-model:
+      title: "&6⌘ Custom Model Data"
+      subtitle: "&eEnter a non-negative integer or CLEAR"
     schedule:
       title: "&6⏰ Schedule Delivery"
       subtitle: "&eFormat: YYYY:MM:DD:HH:mm"

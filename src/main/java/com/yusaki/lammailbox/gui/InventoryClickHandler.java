@@ -460,6 +460,25 @@ public class InventoryClickHandler implements MailInventoryHandler {
                     startAwaiting(player, "command-item-command", "command-item-command", config().getString("messages.enter-command-item-command"));
                 }
                 break;
+            case "custom-model":
+                CommandItem.Builder draft = session.getCommandItemDraft();
+                if (event.isRightClick()) {
+                    if (draft != null) {
+                        draft.customModelData(null);
+                        player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
+                                config().getString("messages.command-item-model-cleared", "&a✔ Custom model data cleared.")));
+                    }
+                    plugin.openCommandItemCreator(player);
+                } else {
+                    startAwaiting(player,
+                            "command-item-custom-model",
+                            "command-item-custom-model",
+                            config().getString("messages.enter-command-item-custom-model"));
+                }
+                break;
+            case "command-creator-back":
+                plugin.openCommandItemsEditor(player);
+                break;
             case "save":
                 if (plugin.getMailCreationController().finalizeCommandItem(player, session)) {
                     plugin.openCommandItemsEditor(player);

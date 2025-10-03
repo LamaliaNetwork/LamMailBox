@@ -762,6 +762,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                         .map(line -> line.replace("%schedule_time%", scheduleTime).replace("%expire_time%", expireTime))
                         .map(plugin::colorize)
                         .collect(Collectors.toList()));
+                applyItemMetaCustomizations(clockMeta, "gui.create-mail.items.schedule-clock");
                 clock.setItemMeta(clockMeta);
                 inv.setItem(clockSlot, clock);
             }
@@ -856,11 +857,15 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         placeholders.put("%name%", draft.displayName());
         placeholders.put("%lore_count%", String.valueOf(draft.lore().size()));
         placeholders.put("%command_count%", String.valueOf(draft.commands().size()));
+        placeholders.put("%custom_model_data%", draft.customModelData() != null
+                ? String.valueOf(draft.customModelData())
+                : "None");
 
         placeCreatorButton(inv, base + ".items.material-selector", "material", placeholders, draft);
         placeCreatorButton(inv, base + ".items.name-editor", "name", placeholders, draft);
         placeCreatorButton(inv, base + ".items.lore-editor", "lore", placeholders, draft);
         placeCreatorButton(inv, base + ".items.commands-editor", "command", placeholders, draft);
+        placeCreatorButton(inv, base + ".items.custom-model-editor", "custom-model", placeholders, draft);
 
         // Preview item
         int previewSlot = config().getInt(base + ".items.preview.slot", size / 2);
@@ -871,6 +876,8 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             ItemStack save = buildEditorStaticButton(base + ".items.save-button", "save");
             inv.setItem(config().getInt(base + ".items.save-button.slot", size - 6), save);
         }
+
+        placeBackButton(inv, base + ".items.back-button", "command-creator-back");
 
         return inv;
     }
@@ -1373,6 +1380,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                 appendDetailLines(lore, "&7Lore:", draft.lore(), 10, false);
             } else if ("command".equals(action) && !draft.commands().isEmpty()) {
                 appendDetailLines(lore, "&7Commands:", draft.commands(), 10, true);
+            } else if ("custom-model".equals(action)) {
+                String value = draft.customModelData() != null ? String.valueOf(draft.customModelData()) : "None";
+                lore.add(plugin.colorize("&7Current: &f" + value));
             }
 
             if (!lore.isEmpty()) {
@@ -1380,6 +1390,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             }
 
             meta.getPersistentDataContainer().set(commandItemActionKey, PersistentDataType.STRING, action);
+            applyItemMetaCustomizations(meta, path);
             item.setItemMeta(meta);
         }
         inv.setItem(slot, item);
@@ -1393,6 +1404,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         result = result.replace("%name%", draft.displayName());
         result = result.replace("%lore_count%", String.valueOf(draft.lore().size()));
         result = result.replace("%command_count%", String.valueOf(draft.commands().size()));
+        result = result.replace("%custom_model_data%", draft.customModelData() != null
+                ? String.valueOf(draft.customModelData())
+                : "None");
         if (!draft.commands().isEmpty()) {
             result = result.replace("%first_command%", draft.commands().get(0));
             result = result.replace("%summary%", summarizeCommand(draft.commands().get(0)));
@@ -1430,6 +1444,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         placeholders.put("%lore_count%", String.valueOf(loreCount));
         placeholders.put("%lore_values%", formatList(commandItem.lore(), 3, false));
         placeholders.put("%first_lore%", loreCount > 0 ? commandItem.lore().get(0) : "");
+        placeholders.put("%custom_model_data%", commandItem.customModelData() != null
+                ? String.valueOf(commandItem.customModelData())
+                : "None");
         return placeholders;
     }
 

@@ -414,6 +414,21 @@ public class LamMailBox extends JavaPlugin implements Listener {
                         : config.getString("messages.command-item-command-failed", "&c✖ Command update failed");
                 reopenCommandCreator = true;
                 break;
+            case "command-item-custom-model":
+                String trimmed = message == null ? "" : message.trim();
+                success = mailCreationController.handleCommandItemCustomModelInput(player, message, session);
+                if (success) {
+                    if (trimmed.isEmpty() || trimmed.equalsIgnoreCase("clear") || trimmed.equalsIgnoreCase("none") || trimmed.equalsIgnoreCase("reset")) {
+                        customSubtitle = config.getString("messages.command-item-model-cleared", "&a✔ Custom model data cleared.");
+                    } else {
+                        customSubtitle = config.getString("messages.command-item-model-set", "&a✔ Custom model data updated.")
+                                .replace("%value%", trimmed);
+                    }
+                } else {
+                    customSubtitle = config.getString("messages.command-item-model-invalid", "&c✖ Invalid custom model data.");
+                }
+                reopenCommandCreator = true;
+                break;
             default:
                 success = false;
         }
