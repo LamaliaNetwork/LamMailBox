@@ -420,6 +420,9 @@ public class InventoryClickHandler implements MailInventoryHandler {
         }
         String action = meta.getPersistentDataContainer().get(commandItemActionKey, PersistentDataType.STRING);
         if (action == null) {
+            action = meta.getPersistentDataContainer().get(actionKey, PersistentDataType.STRING);
+        }
+        if (action == null) {
             return;
         }
 
