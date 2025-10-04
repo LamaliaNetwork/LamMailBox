@@ -58,8 +58,19 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
     }
 
     private ItemStack styledCommandIcon(String basePath, ItemStack existing, int commandCount, String summary) {
-        ItemStack stack = existing != null ? existing.clone() : null;
+        ItemStack stack = resolveCommandIconStack(basePath, existing);
+        ItemMeta meta = stack.getItemMeta();
+        if (meta == null) {
+            return stack;
+        }
 
+        applyCommandIconText(meta, basePath, commandCount, summary);
+        stack.setItemMeta(meta);
+        return stack;
+    }
+
+    private ItemStack resolveCommandIconStack(String basePath, ItemStack existing) {
+        ItemStack stack = existing != null ? existing.clone() : null;
         String materialName = config().getString(basePath + ".material");
         if (materialName != null && !materialName.isBlank()) {
             try {
@@ -68,41 +79,34 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                     stack = new ItemStack(material);
                 }
             } catch (IllegalArgumentException ignored) {
-                if (stack == null) {
-                    stack = new ItemStack(Material.COMMAND_BLOCK);
-                }
+                // Fall back to default below
             }
-        } else if (stack == null) {
-            stack = new ItemStack(Material.COMMAND_BLOCK);
         }
-
         if (stack == null) {
             stack = new ItemStack(Material.COMMAND_BLOCK);
         }
-
-        ItemMeta meta = stack.getItemMeta();
-        if (meta != null) {
-            String displayName = config().getString(basePath + ".name");
-            if (displayName != null && !displayName.isBlank()) {
-                meta.setDisplayName(plugin.colorize(displayName
-                        .replace("%count%", String.valueOf(commandCount))
-                        .replace("%summary%", summary)));
-            }
-
-            List<String> rawLore = config().getStringList(basePath + ".lore");
-            if (rawLore == null || rawLore.isEmpty()) {
-                rawLore = Collections.singletonList("&7Contains hidden console actions");
-            }
-            List<String> lore = rawLore.stream()
-                    .map(line -> plugin.colorize(line
-                            .replace("%count%", String.valueOf(commandCount))
-                            .replace("%summary%", summary)))
-                    .collect(Collectors.toList());
-            meta.setLore(lore);
-            applyItemMetaCustomizations(meta, basePath);
-            stack.setItemMeta(meta);
-        }
         return stack;
+    }
+
+    private void applyCommandIconText(ItemMeta meta, String basePath, int commandCount, String summary) {
+        String displayName = config().getString(basePath + ".name");
+        if (displayName != null && !displayName.isBlank()) {
+            meta.setDisplayName(plugin.colorize(displayName
+                    .replace("%count%", String.valueOf(commandCount))
+                    .replace("%summary%", summary)));
+        }
+
+        List<String> rawLore = config().getStringList(basePath + ".lore");
+        if (rawLore == null || rawLore.isEmpty()) {
+            rawLore = Collections.singletonList("&7Contains hidden console actions");
+        }
+        List<String> lore = rawLore.stream()
+                .map(line -> plugin.colorize(line
+                        .replace("%count%", String.valueOf(commandCount))
+                        .replace("%summary%", summary)))
+                .collect(Collectors.toList());
+        meta.setLore(lore);
+        applyItemMetaCustomizations(meta, basePath);
     }
 
     private void placeItemsAndCommands(Inventory inv,
@@ -328,46 +332,70 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             return;
         }
 
-        Object loreValue = config().get(basePath + ".lore");
-        List<String> loreLines = new ArrayList<>();
-        if (loreValue instanceof String singleLine && !singleLine.isBlank()) {
-            loreLines.add(singleLine);
-        } else if (loreValue instanceof Collection<?> collection) {
-            for (Object entry : collection) {
-                if (entry != null) {
-                    String line = entry.toString();
-                    if (!line.isBlank()) {
-                        loreLines.add(line);
-                    }
-                }
-            }
-        }
-        if (!loreLines.isEmpty()) {
-            boolean hasExistingLore = meta.hasLore() && meta.getLore() != null && !meta.getLore().isEmpty();
-            if (allowLoreOverride || !hasExistingLore) {
-                List<String> colorized = loreLines.stream()
-                        .map(plugin::colorize)
-                        .collect(Collectors.toList());
-                meta.setLore(colorized);
-            }
-        }
+        applyLoreCustomization(meta, basePath, allowLoreOverride);
+        applyCustomModelData(meta, basePath);
+    }
 
-        if (config().contains(basePath + ".custom-model-data")) {
-            Object rawValue = config().get(basePath + ".custom-model-data");
-            Integer customModelData = null;
-            if (rawValue instanceof Number number) {
-                customModelData = number.intValue();
-            } else if (rawValue instanceof String text && !text.isBlank()) {
-                try {
-                    customModelData = Integer.parseInt(text.trim());
-                } catch (NumberFormatException ignored) {
-                    customModelData = null;
+    private void applyLoreCustomization(ItemMeta meta, String basePath, boolean allowLoreOverride) {
+        List<String> loreLines = collectLoreLines(basePath);
+        if (loreLines.isEmpty()) {
+            return;
+        }
+        boolean hasExistingLore = meta.hasLore() && meta.getLore() != null && !meta.getLore().isEmpty();
+        if (!allowLoreOverride && hasExistingLore) {
+            return;
+        }
+        List<String> colorized = loreLines.stream()
+                .map(plugin::colorize)
+                .collect(Collectors.toList());
+        meta.setLore(colorized);
+    }
+
+    private List<String> collectLoreLines(String basePath) {
+        Object loreValue = config().get(basePath + ".lore");
+        List<String> lines = new ArrayList<>();
+        if (loreValue instanceof String singleLine) {
+            if (!singleLine.isBlank()) {
+                lines.add(singleLine);
+            }
+            return lines;
+        }
+        if (loreValue instanceof Collection<?> collection) {
+            for (Object entry : collection) {
+                if (entry == null) {
+                    continue;
+                }
+                String line = entry.toString();
+                if (!line.isBlank()) {
+                    lines.add(line);
                 }
             }
-            if (customModelData != null) {
-                meta.setCustomModelData(customModelData);
+        }
+        return lines;
+    }
+
+    private void applyCustomModelData(ItemMeta meta, String basePath) {
+        if (!config().contains(basePath + ".custom-model-data")) {
+            return;
+        }
+        Integer customModelData = parseCustomModelData(config().get(basePath + ".custom-model-data"));
+        if (customModelData != null) {
+            meta.setCustomModelData(customModelData);
+        }
+    }
+
+    private Integer parseCustomModelData(Object rawValue) {
+        if (rawValue instanceof Number number) {
+            return number.intValue();
+        }
+        if (rawValue instanceof String text && !text.isBlank()) {
+            try {
+                return Integer.parseInt(text.trim());
+            } catch (NumberFormatException ignored) {
+                return null;
             }
         }
+        return null;
     }
 
     private void placeBackButton(Inventory inv, String path, String action) {
@@ -406,27 +434,31 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
     private Integer findAvailableSlot(Inventory inv,
                                       int preferred,
                                       Set<Integer> reservedSlots) {
-        int inventorySize = inv.getSize();
         int[] offsets = {0, -1, 1, -2, 2, -3, 3, -4, 4};
         for (int offset : offsets) {
             int candidate = preferred + offset;
-            if (candidate < 0 || candidate >= inventorySize) {
-                continue;
+            if (isSlotAvailable(inv, candidate, reservedSlots)) {
+                return candidate;
             }
-            if (reservedSlots.contains(candidate)) {
-                continue;
-            }
-            ItemStack existing = inv.getItem(candidate);
-            if (existing != null) {
-                ItemMeta meta = existing.getItemMeta();
-                if (meta == null || !meta.getPersistentDataContainer().has(decorationKey, PersistentDataType.STRING)) {
-                    continue;
-                }
-            }
-            return candidate;
         }
         plugin.getLogger().warning("Unable to place pagination control; no free slot near " + preferred);
         return null;
+    }
+
+    private boolean isSlotAvailable(Inventory inv, int candidate, Set<Integer> reservedSlots) {
+        if (candidate < 0 || candidate >= inv.getSize()) {
+            return false;
+        }
+        if (reservedSlots.contains(candidate)) {
+            return false;
+        }
+        ItemStack existing = inv.getItem(candidate);
+        return existing == null || isDecorationItem(existing);
+    }
+
+    private boolean isDecorationItem(ItemStack existing) {
+        ItemMeta meta = existing.getItemMeta();
+        return meta != null && meta.getPersistentDataContainer().has(decorationKey, PersistentDataType.STRING);
     }
 
     private String summarizeCommand(String command) {
@@ -694,114 +726,157 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         Inventory inv = Bukkit.createInventory(null, size, plugin.colorize(config().getString("gui.create-mail.title")));
         addDecorations(inv, "gui.create-mail");
 
-        if (isEnabled("gui.create-mail.items.receiver-head")) {
-            ItemStack head = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.receiver-head.material")));
-            SkullMeta headMeta = (SkullMeta) head.getItemMeta();
-            headMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.receiver-head.name")));
-            List<String> headLore = viewer.hasPermission(config().getString("settings.admin-permission")) ?
-                    config().getStringList("gui.create-mail.items.receiver-head.adminlore") :
-                    config().getStringList("gui.create-mail.items.receiver-head.lore");
-            List<String> lore = headLore.stream().map(plugin::colorize).collect(Collectors.toList());
-            if (session.getReceiver() != null) {
-                lore.add(plugin.colorize(config().getString("gui.create-mail.items.receiver-head.current-receiver-format")
-                        .replace("%receiver%", session.getReceiver())));
-            }
-            headMeta.setLore(lore);
-            applyItemMetaCustomizations(headMeta, "gui.create-mail.items.receiver-head", false);
-            head.setItemMeta(headMeta);
-            inv.setItem(config().getInt("gui.create-mail.items.receiver-head.slot"), head);
-        }
-
-        if (isEnabled("gui.create-mail.items.message-paper")) {
-            ItemStack paper = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.message-paper.material")));
-            ItemMeta paperMeta = paper.getItemMeta();
-            paperMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.message-paper.name")));
-            List<String> paperLore = new ArrayList<>(config().getStringList("gui.create-mail.items.message-paper.lore"));
-            paperLore = paperLore.stream().map(plugin::colorize).collect(Collectors.toList());
-            if (session.getMessage() != null) {
-                paperLore.add(plugin.colorize(config().getString("gui.create-mail.items.message-paper.current-message-prefix")));
-                paperLore.addAll(Arrays.stream(session.getMessage().split("\n"))
-                        .map(line -> plugin.colorize(config().getString("gui.create-mail.items.message-paper.message-line-format") + line))
-                        .collect(Collectors.toList()));
-            }
-            paperMeta.setLore(paperLore);
-            applyItemMetaCustomizations(paperMeta, "gui.create-mail.items.message-paper");
-            paper.setItemMeta(paperMeta);
-            inv.setItem(config().getInt("gui.create-mail.items.message-paper.slot"), paper);
-        }
-
-        if (isEnabled("gui.create-mail.items.items-chest")) {
-            int chestSlot = config().getInt("gui.create-mail.items.items-chest.slot");
-            if (viewer.hasPermission(config().getString("settings.permissions.add-items"))) {
-                ItemStack chest = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.items-chest.material")));
-                ItemMeta chestMeta = chest.getItemMeta();
-                chestMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.items-chest.name")));
-                chestMeta.setLore(config().getStringList("gui.create-mail.items.items-chest.lore").stream()
-                        .map(plugin::colorize)
-                        .collect(Collectors.toList()));
-                applyItemMetaCustomizations(chestMeta, "gui.create-mail.items.items-chest");
-                chest.setItemMeta(chestMeta);
-                inv.setItem(chestSlot, chest);
-            } else {
-                inv.setItem(chestSlot, createDisabledFiller());
-            }
-        }
-
-        if (isEnabled("gui.create-mail.items.send-button")) {
-            ItemStack sendButton = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.send-button.material")));
-            ItemMeta sendMeta = sendButton.getItemMeta();
-            sendMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.send-button.name")));
-            sendMeta.setLore(config().getStringList("gui.create-mail.items.send-button.lore").stream()
-                    .map(plugin::colorize)
-                    .collect(Collectors.toList()));
-            applyItemMetaCustomizations(sendMeta, "gui.create-mail.items.send-button");
-            sendButton.setItemMeta(sendMeta);
-            inv.setItem(config().getInt("gui.create-mail.items.send-button.slot"), sendButton);
-        }
-
-        int commandSlot = config().getInt("gui.create-mail.items.command-block.slot");
-        int clockSlot = config().getInt("gui.create-mail.items.schedule-clock.slot");
-        boolean commandEnabled = isEnabled("gui.create-mail.items.command-block");
-        boolean clockEnabled = isEnabled("gui.create-mail.items.schedule-clock");
-        if (viewer.hasPermission(config().getString("settings.admin-permission"))) {
-            if (commandEnabled) {
-                ItemStack commandButton = createCommandItemsButton(session);
-                inv.setItem(commandSlot, commandButton);
-            }
-
-            if (clockEnabled) {
-                ItemStack clock = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.schedule-clock.material")));
-                ItemMeta clockMeta = clock.getItemMeta();
-                clockMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.schedule-clock.name")));
-
-                // Replace schedule and expire time placeholders
-                String scheduleTime = session.getScheduleDate() != null ?
-                        new java.text.SimpleDateFormat("yyyy:MM:dd:HH:mm").format(new java.util.Date(session.getScheduleDate())) :
-                        "Not set";
-                String expireTime = session.getExpireDate() != null ?
-                        new java.text.SimpleDateFormat("yyyy:MM:dd:HH:mm").format(new java.util.Date(session.getExpireDate())) :
-                        "Not set";
-
-                clockMeta.setLore(config().getStringList("gui.create-mail.items.schedule-clock.lore").stream()
-                        .map(line -> line.replace("%schedule_time%", scheduleTime).replace("%expire_time%", expireTime))
-                        .map(plugin::colorize)
-                        .collect(Collectors.toList()));
-                applyItemMetaCustomizations(clockMeta, "gui.create-mail.items.schedule-clock");
-                clock.setItemMeta(clockMeta);
-                inv.setItem(clockSlot, clock);
-            }
-        } else {
-            if (commandEnabled) {
-                inv.setItem(commandSlot, createDisabledFiller());
-            }
-            if (clockEnabled) {
-                inv.setItem(clockSlot, createDisabledFiller());
-            }
-        }
+        addReceiverHead(inv, viewer, session);
+        addMessagePaper(inv, session);
+        addItemsChest(inv, viewer);
+        addSendButton(inv);
+        addAdminControls(inv, viewer, session);
 
         placeBackButton(inv, "gui.create-mail.items.back-button", "create-back");
 
         return inv;
+    }
+
+    private void addReceiverHead(Inventory inv, Player viewer, MailCreationSession session) {
+        if (!isEnabled("gui.create-mail.items.receiver-head")) {
+            return;
+        }
+        ItemStack head = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.receiver-head.material")));
+        SkullMeta headMeta = (SkullMeta) head.getItemMeta();
+        if (headMeta == null) {
+            return;
+        }
+        headMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.receiver-head.name")));
+        List<String> headLore = viewer.hasPermission(config().getString("settings.admin-permission")) ?
+                config().getStringList("gui.create-mail.items.receiver-head.adminlore") :
+                config().getStringList("gui.create-mail.items.receiver-head.lore");
+        List<String> lore = headLore.stream().map(plugin::colorize).collect(Collectors.toList());
+        if (session.getReceiver() != null) {
+            lore.add(plugin.colorize(config().getString("gui.create-mail.items.receiver-head.current-receiver-format")
+                    .replace("%receiver%", session.getReceiver())));
+        }
+        headMeta.setLore(lore);
+        applyItemMetaCustomizations(headMeta, "gui.create-mail.items.receiver-head", false);
+        head.setItemMeta(headMeta);
+        inv.setItem(config().getInt("gui.create-mail.items.receiver-head.slot"), head);
+    }
+
+    private void addMessagePaper(Inventory inv, MailCreationSession session) {
+        if (!isEnabled("gui.create-mail.items.message-paper")) {
+            return;
+        }
+        ItemStack paper = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.message-paper.material")));
+        ItemMeta paperMeta = paper.getItemMeta();
+        if (paperMeta == null) {
+            return;
+        }
+        paperMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.message-paper.name")));
+        List<String> paperLore = config().getStringList("gui.create-mail.items.message-paper.lore").stream()
+                .map(plugin::colorize)
+                .collect(Collectors.toList());
+        if (session.getMessage() != null) {
+            paperLore.add(plugin.colorize(config().getString("gui.create-mail.items.message-paper.current-message-prefix")));
+            paperLore.addAll(Arrays.stream(session.getMessage().split("\n"))
+                    .map(line -> plugin.colorize(config().getString("gui.create-mail.items.message-paper.message-line-format") + line))
+                    .collect(Collectors.toList()));
+        }
+        paperMeta.setLore(paperLore);
+        applyItemMetaCustomizations(paperMeta, "gui.create-mail.items.message-paper");
+        paper.setItemMeta(paperMeta);
+        inv.setItem(config().getInt("gui.create-mail.items.message-paper.slot"), paper);
+    }
+
+    private void addItemsChest(Inventory inv, Player viewer) {
+        if (!isEnabled("gui.create-mail.items.items-chest")) {
+            return;
+        }
+        int chestSlot = config().getInt("gui.create-mail.items.items-chest.slot");
+        if (!viewer.hasPermission(config().getString("settings.permissions.add-items"))) {
+            inv.setItem(chestSlot, createDisabledFiller());
+            return;
+        }
+        ItemStack chest = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.items-chest.material")));
+        ItemMeta chestMeta = chest.getItemMeta();
+        if (chestMeta == null) {
+            return;
+        }
+        chestMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.items-chest.name")));
+        chestMeta.setLore(config().getStringList("gui.create-mail.items.items-chest.lore").stream()
+                .map(plugin::colorize)
+                .collect(Collectors.toList()));
+        applyItemMetaCustomizations(chestMeta, "gui.create-mail.items.items-chest");
+        chest.setItemMeta(chestMeta);
+        inv.setItem(chestSlot, chest);
+    }
+
+    private void addSendButton(Inventory inv) {
+        if (!isEnabled("gui.create-mail.items.send-button")) {
+            return;
+        }
+        ItemStack sendButton = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.send-button.material")));
+        ItemMeta sendMeta = sendButton.getItemMeta();
+        if (sendMeta == null) {
+            return;
+        }
+        sendMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.send-button.name")));
+        sendMeta.setLore(config().getStringList("gui.create-mail.items.send-button.lore").stream()
+                .map(plugin::colorize)
+                .collect(Collectors.toList()));
+        applyItemMetaCustomizations(sendMeta, "gui.create-mail.items.send-button");
+        sendButton.setItemMeta(sendMeta);
+        inv.setItem(config().getInt("gui.create-mail.items.send-button.slot"), sendButton);
+    }
+
+    private void addAdminControls(Inventory inv, Player viewer, MailCreationSession session) {
+        int commandSlot = config().getInt("gui.create-mail.items.command-block.slot");
+        int clockSlot = config().getInt("gui.create-mail.items.schedule-clock.slot");
+        boolean commandEnabled = isEnabled("gui.create-mail.items.command-block");
+        boolean clockEnabled = isEnabled("gui.create-mail.items.schedule-clock");
+        boolean isAdmin = viewer.hasPermission(config().getString("settings.admin-permission"));
+
+        if (isAdmin) {
+            if (commandEnabled) {
+                inv.setItem(commandSlot, createCommandItemsButton(session));
+            }
+            if (clockEnabled) {
+                inv.setItem(clockSlot, buildScheduleClock(session));
+            }
+            return;
+        }
+
+        if (commandEnabled) {
+            inv.setItem(commandSlot, createDisabledFiller());
+        }
+        if (clockEnabled) {
+            inv.setItem(clockSlot, createDisabledFiller());
+        }
+    }
+
+    private ItemStack buildScheduleClock(MailCreationSession session) {
+        String basePath = "gui.create-mail.items.schedule-clock";
+        ItemStack clock = new ItemStack(Material.valueOf(config().getString(basePath + ".material")));
+        ItemMeta clockMeta = clock.getItemMeta();
+        if (clockMeta == null) {
+            return clock;
+        }
+
+        clockMeta.setDisplayName(plugin.colorize(config().getString(basePath + ".name")));
+
+        String scheduleTime = session.getScheduleDate() != null ?
+                new java.text.SimpleDateFormat("yyyy:MM:dd:HH:mm").format(new java.util.Date(session.getScheduleDate())) :
+                "Not set";
+        String expireTime = session.getExpireDate() != null ?
+                new java.text.SimpleDateFormat("yyyy:MM:dd:HH:mm").format(new java.util.Date(session.getExpireDate())) :
+                "Not set";
+
+        List<String> lore = config().getStringList(basePath + ".lore").stream()
+                .map(line -> line.replace("%schedule_time%", scheduleTime).replace("%expire_time%", expireTime))
+                .map(plugin::colorize)
+                .collect(Collectors.toList());
+        clockMeta.setLore(lore);
+        applyItemMetaCustomizations(clockMeta, basePath);
+        clock.setItemMeta(clockMeta);
+        return clock;
     }
 
     @Override
@@ -1284,83 +1359,100 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
 
     private ItemStack createCommandItemsButton(MailCreationSession session) {
         String basePath = "gui.create-mail.items.command-block";
-        Material material = Material.COMMAND_BLOCK;
-        String materialKey = config().getString(basePath + ".material");
-        if (materialKey != null) {
-            Material match = Material.matchMaterial(materialKey);
-            if (match != null) {
-                material = match;
-            }
-        }
-
-        ItemStack item = new ItemStack(material);
+        ItemStack item = new ItemStack(resolveMaterial(basePath + ".material", Material.COMMAND_BLOCK));
         ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
-            String name = config().getString(basePath + ".name", "&6Command Items");
-            meta.setDisplayName(plugin.colorize(name
-                    .replace("%count%", String.valueOf(session.getCommandItems().size()))));
-
-            List<String> loreTemplate = config().getStringList(basePath + ".lore");
-            List<String> lore = loreTemplate.stream()
-                    .map(line -> line
-                            .replace("%count%", String.valueOf(session.getCommandItems().size())))
-                    .map(plugin::colorize)
-                    .collect(Collectors.toList());
-
-            if (!session.getCommandItems().isEmpty()) {
-                List<String> summaries = session.getCommandItems().stream()
-                        .map(commandItem -> {
-                            String first = commandItem.commands().isEmpty() ? "" : commandItem.commands().get(0);
-                            String summary = first.isEmpty() ? "No command" : Optional.ofNullable(summarizeCommand(first)).orElse(first);
-                            String display = commandItem.displayName() != null ? commandItem.displayName() : "Action";
-                            return display + " → " + summary;
-                        })
-                        .collect(Collectors.toList());
-                appendDetailLines(lore, "&7Configured actions:", summaries, 4, false);
-            }
-
-            meta.setLore(lore);
-            applyItemMetaCustomizations(meta, basePath, false);
-            item.setItemMeta(meta);
+        if (meta == null) {
+            return item;
         }
+
+        applyCommandItemsTitle(meta, basePath, session);
+        meta.setLore(buildCommandItemsLore(session, basePath));
+        applyItemMetaCustomizations(meta, basePath, false);
+        item.setItemMeta(meta);
         return item;
+    }
+
+    private void applyCommandItemsTitle(ItemMeta meta, String basePath, MailCreationSession session) {
+        String name = config().getString(basePath + ".name", "&6Command Items");
+        String formatted = name.replace("%count%", String.valueOf(session.getCommandItems().size()));
+        meta.setDisplayName(plugin.colorize(formatted));
+    }
+
+    private List<String> buildCommandItemsLore(MailCreationSession session, String basePath) {
+        int count = session.getCommandItems().size();
+        List<String> lore = config().getStringList(basePath + ".lore").stream()
+                .map(line -> line.replace("%count%", String.valueOf(count)))
+                .map(plugin::colorize)
+                .collect(Collectors.toList());
+        if (!session.getCommandItems().isEmpty()) {
+            List<String> summaries = session.getCommandItems().stream()
+                    .map(this::formatCommandItemSummary)
+                    .collect(Collectors.toList());
+            appendDetailLines(lore, "&7Configured actions:", summaries, 4, false);
+        }
+        return lore;
+    }
+
+    private String formatCommandItemSummary(CommandItem commandItem) {
+        String first = commandItem.commands().isEmpty() ? "" : commandItem.commands().get(0);
+        String summary = first.isEmpty() ? "No command" : Optional.ofNullable(summarizeCommand(first)).orElse(first);
+        String display = commandItem.displayName() != null ? commandItem.displayName() : "Action";
+        return display + " → " + summary;
+    }
+
+    private Material resolveMaterial(String materialPath, Material fallback) {
+        String materialKey = config().getString(materialPath);
+        if (materialKey == null || materialKey.isBlank()) {
+            return fallback;
+        }
+        Material match = Material.matchMaterial(materialKey);
+        return match != null ? match : fallback;
     }
 
     private ItemStack buildCommandItemEditorEntry(CommandItem commandItem, int index) {
         String base = "gui.command-items-editor.items.command-item";
         ItemStack stack = commandItem.toPreviewItem(plugin);
         ItemMeta meta = stack.getItemMeta();
-        if (meta != null) {
-            // Keep the actual item name - don't overwrite with template
-
-            // Start with existing lore from the item (user's configured lore)
-            List<String> lore = new ArrayList<>();
-            if (meta.hasLore()) {
-                lore.addAll(meta.getLore());
-            }
-
-            // Append greyed out command information
-            String commandHeader = config().getString(base + ".command-header", "&7Commands:");
-            appendDetailLines(lore, commandHeader, commandItem.commands(), 5, true);
-
-            // Append action instructions from config
-            List<String> actionLore = config().getStringList(base + ".lore");
-            if (!actionLore.isEmpty()) {
-                if (!lore.isEmpty()) {
-                    lore.add(plugin.colorize("&7"));
-                }
-                lore.addAll(actionLore.stream()
-                        .map(plugin::colorize)
-                        .collect(Collectors.toList()));
-            }
-            meta.setLore(lore);
-            if (!meta.hasCustomModelData()) {
-                applyItemMetaCustomizations(meta, base, false);
-            }
-            meta.getPersistentDataContainer().set(commandItemIndexKey, PersistentDataType.INTEGER, index);
-            stack.setItemMeta(meta);
+        if (meta == null) {
+            return stack;
         }
+
+        List<String> lore = buildCommandItemEditorLore(commandItem, base, meta);
+        meta.setLore(lore);
+        if (!meta.hasCustomModelData()) {
+            applyItemMetaCustomizations(meta, base, false);
+        }
+        meta.getPersistentDataContainer().set(commandItemIndexKey, PersistentDataType.INTEGER, index);
+        stack.setItemMeta(meta);
         return stack;
+    }
+
+    private List<String> buildCommandItemEditorLore(CommandItem commandItem, String base, ItemMeta existingMeta) {
+        List<String> lore = new ArrayList<>();
+        if (existingMeta.hasLore() && existingMeta.getLore() != null) {
+            lore.addAll(existingMeta.getLore());
+        }
+        appendCommandDetails(lore, base, commandItem);
+        appendActionInstructions(lore, base);
+        return lore;
+    }
+
+    private void appendCommandDetails(List<String> lore, String base, CommandItem commandItem) {
+        String commandHeader = config().getString(base + ".command-header", "&7Commands:");
+        appendDetailLines(lore, commandHeader, commandItem.commands(), 5, true);
+    }
+
+    private void appendActionInstructions(List<String> lore, String base) {
+        List<String> actionLore = config().getStringList(base + ".lore");
+        if (actionLore.isEmpty()) {
+            return;
+        }
+        if (!lore.isEmpty()) {
+            lore.add(plugin.colorize("&7"));
+        }
+        lore.addAll(actionLore.stream()
+                .map(plugin::colorize)
+                .collect(Collectors.toList()));
     }
 
     private ItemStack buildEditorStaticButton(String path, String action) {
