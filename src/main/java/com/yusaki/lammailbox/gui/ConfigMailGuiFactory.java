@@ -19,7 +19,6 @@ import org.bukkit.persistence.PersistentDataType;
 
 import java.util.*;
 import java.util.Date;
-import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
 /**
@@ -34,6 +33,12 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
     private final NamespacedKey mailIdKey;
     private final NamespacedKey paginationTargetKey;
 
+    private final GuiItemStyler itemStyler;
+    private final GuiNavigationHelper navigationHelper;
+    private final PaginationBuilder paginationBuilder;
+    private final CommandItemUiComposer commandItemUi;
+    private final MailCreationViewBuilder mailCreationBuilder;
+
     public ConfigMailGuiFactory(LamMailBox plugin) {
         this.plugin = plugin;
         this.decorationKey = new NamespacedKey(plugin, "decorationPath");
@@ -42,19 +47,12 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         this.actionKey = new NamespacedKey(plugin, "action");
         this.mailIdKey = new NamespacedKey(plugin, "mailId");
         this.paginationTargetKey = new NamespacedKey(plugin, "paginationTarget");
-    }
 
-    private enum PaginationButtonType {
-        PREVIOUS,
-        NEXT,
-        INDICATOR
-    }
-
-    private record PaginationSettings(String basePath,
-                                       Set<Integer> reservedSlots,
-                                       String previousAction,
-                                       String nextAction,
-                                       BiConsumer<ItemMeta, PaginationButtonType> metaCustomizer) {
+        this.itemStyler = new GuiItemStyler(plugin);
+        this.navigationHelper = new GuiNavigationHelper(plugin, actionKey, itemStyler);
+        this.paginationBuilder = new PaginationBuilder(plugin, actionKey, decorationKey, itemStyler);
+        this.commandItemUi = new CommandItemUiComposer(plugin, itemStyler, commandItemIndexKey, commandItemActionKey);
+        this.mailCreationBuilder = new MailCreationViewBuilder(plugin, itemStyler, navigationHelper, commandItemUi, this::addDecorations, this::isEnabled);
     }
 
     private ItemStack styledCommandIcon(String basePath, ItemStack existing, int commandCount, String summary) {
@@ -106,7 +104,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                         .replace("%summary%", summary)))
                 .collect(Collectors.toList());
         meta.setLore(lore);
-        applyItemMetaCustomizations(meta, basePath);
+        itemStyler.apply(meta, basePath);
     }
 
     private void placeItemsAndCommands(Inventory inv,
@@ -141,52 +139,12 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                 // Place actual item
                 inv.setItem(itemSlots.get(slotIndex++), (ItemStack) element);
             } else if (element instanceof CommandItem commandItem) {
-                ItemStack commandIcon = createCommandPlaceholder(commandPath, commandItem);
+                ItemStack commandIcon = commandItemUi.createCommandPlaceholder(commandPath, commandItem);
                 inv.setItem(itemSlots.get(slotIndex++), commandIcon);
             }
         }
     }
 
-    private ItemStack createCommandPlaceholder(String commandPath, CommandItem commandItem) {
-        ItemStack base = commandItem.toPreviewItem(plugin);
-
-        // Check if this is a legacy command (single-line command with default styling)
-        boolean isLegacy = commandItem.displayName() != null &&
-                           commandItem.displayName().equals("&6Console Command");
-
-        if (isLegacy) {
-            // Apply config overrides for legacy commands
-            String legacyPath = commandPath.replace("command-item", "command-legacy");
-            ItemMeta meta = base.getItemMeta();
-            if (meta != null) {
-                Map<String, String> placeholders = createCommandItemPlaceholders(commandItem);
-
-                String overrideName = config().getString(legacyPath + ".name");
-                if (overrideName != null && !overrideName.isBlank()) {
-                    meta.setDisplayName(plugin.colorize(applyPlaceholders(overrideName, placeholders)));
-                }
-
-                List<String> configuredLore = config().getStringList(legacyPath + ".lore");
-                if (!configuredLore.isEmpty()) {
-                    List<String> lore = configuredLore.stream()
-                            .map(line -> plugin.colorize(applyPlaceholders(line, placeholders)))
-                            .collect(Collectors.toList());
-                    meta.setLore(lore);
-                }
-
-                base.setItemMeta(meta);
-            }
-        }
-
-        ItemMeta finalMeta = base.getItemMeta();
-        if (finalMeta != null && !finalMeta.hasCustomModelData()) {
-            applyItemMetaCustomizations(finalMeta, commandPath, false);
-            base.setItemMeta(finalMeta);
-        }
-
-        // User-created CommandItems are returned as-is
-        return base;
-    }
 
     private void addPaginationButtons(Inventory inv,
                                       String mailId,
@@ -202,308 +160,19 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             reservedSlots.add(dismissSlot);
         }
 
-        PaginationSettings settings = new PaginationSettings(
+        PaginationBuilder.Settings settings = new PaginationBuilder.Settings(
                 "gui.mail-view.items.pagination",
                 reservedSlots,
                 "page-prev",
                 "page-next",
                 (meta, type) -> {
-                    if (type != PaginationButtonType.INDICATOR) {
+                    if (type != PaginationBuilder.PaginationButtonType.INDICATOR) {
                         meta.getPersistentDataContainer().set(mailIdKey, PersistentDataType.STRING, mailId);
                     }
                 }
         );
 
-        addPaginationButtons(inv, settings, currentPage, totalPages);
-    }
-
-    private void addPaginationButtons(Inventory inv,
-                                      PaginationSettings settings,
-                                      int currentPage,
-                                      int totalPages) {
-        if (totalPages <= 1) {
-            return;
-        }
-
-        String basePath = settings.basePath();
-        Set<Integer> reservedSlots = settings.reservedSlots() != null
-                ? new HashSet<>(settings.reservedSlots())
-                : new HashSet<>();
-
-        if (isEnabled(basePath + ".previous-button") && currentPage > 1) {
-            placePaginationButton(inv,
-                    basePath + ".previous-button",
-                    "ARROW",
-                    "&e← Previous",
-                    36,
-                    PaginationButtonType.PREVIOUS,
-                    currentPage,
-                    totalPages,
-                    settings.previousAction(),
-                    reservedSlots,
-                    settings.metaCustomizer());
-        }
-
-        if (isEnabled(basePath + ".next-button") && currentPage < totalPages) {
-            placePaginationButton(inv,
-                    basePath + ".next-button",
-                    "ARROW",
-                    "&eNext →",
-                    44,
-                    PaginationButtonType.NEXT,
-                    currentPage,
-                    totalPages,
-                    settings.nextAction(),
-                    reservedSlots,
-                    settings.metaCustomizer());
-        }
-
-        if (isEnabled(basePath + ".page-indicator")) {
-            placePaginationButton(inv,
-                    basePath + ".page-indicator",
-                    "BOOK",
-                    "&6Page %current%/%total%",
-                    40,
-                    PaginationButtonType.INDICATOR,
-                    currentPage,
-                    totalPages,
-                    null,
-                    reservedSlots,
-                    settings.metaCustomizer());
-        }
-    }
-
-    private void placePaginationButton(Inventory inv,
-                                       String path,
-                                       String defaultMaterial,
-                                       String defaultName,
-                                       int defaultSlot,
-                                       PaginationButtonType type,
-                                       int currentPage,
-                                       int totalPages,
-                                       String action,
-                                       Set<Integer> reservedSlots,
-                                       BiConsumer<ItemMeta, PaginationButtonType> metaCustomizer) {
-        int preferred = config().getInt(path + ".slot", defaultSlot);
-        String materialName = config().getString(path + ".material", defaultMaterial);
-        Material material = Material.matchMaterial(materialName);
-        if (material == null) {
-            return;
-        }
-
-        ItemStack button = new ItemStack(material);
-        ItemMeta meta = button.getItemMeta();
-        if (meta == null) {
-            return;
-        }
-
-        String name = config().getString(path + ".name", defaultName);
-        if (name != null) {
-            if (type == PaginationButtonType.INDICATOR) {
-                name = name.replace("%current%", String.valueOf(currentPage))
-                        .replace("%total%", String.valueOf(totalPages));
-            }
-            meta.setDisplayName(plugin.colorize(name));
-        }
-
-        if (type != PaginationButtonType.INDICATOR && action != null) {
-            meta.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, action);
-        }
-
-        if (metaCustomizer != null) {
-            metaCustomizer.accept(meta, type);
-        }
-
-        applyItemMetaCustomizations(meta, path);
-        button.setItemMeta(meta);
-        Integer targetSlot = findAvailableSlot(inv, preferred, reservedSlots);
-        if (targetSlot != null) {
-            inv.setItem(targetSlot, button);
-        }
-    }
-
-
-    private void applyItemMetaCustomizations(ItemMeta meta, String basePath) {
-        applyItemMetaCustomizations(meta, basePath, true);
-    }
-
-    private void applyItemMetaCustomizations(ItemMeta meta, String basePath, boolean allowLoreOverride) {
-        if (meta == null || basePath == null || basePath.isEmpty()) {
-            return;
-        }
-
-        applyLoreCustomization(meta, basePath, allowLoreOverride);
-        applyCustomModelData(meta, basePath);
-    }
-
-    private void applyLoreCustomization(ItemMeta meta, String basePath, boolean allowLoreOverride) {
-        List<String> loreLines = collectLoreLines(basePath);
-        if (loreLines.isEmpty()) {
-            return;
-        }
-        boolean hasExistingLore = meta.hasLore() && meta.getLore() != null && !meta.getLore().isEmpty();
-        if (!allowLoreOverride && hasExistingLore) {
-            return;
-        }
-        List<String> colorized = loreLines.stream()
-                .map(plugin::colorize)
-                .collect(Collectors.toList());
-        meta.setLore(colorized);
-    }
-
-    private List<String> collectLoreLines(String basePath) {
-        Object loreValue = config().get(basePath + ".lore");
-        if (loreValue instanceof String singleLine) {
-            return collectSingleLoreLine(singleLine);
-        }
-        if (loreValue instanceof Collection<?> collection) {
-            return collectLoreFromCollection(collection);
-        }
-        return Collections.emptyList();
-    }
-
-    private List<String> collectSingleLoreLine(String line) {
-        if (line == null || line.isBlank()) {
-            return Collections.emptyList();
-        }
-        return Collections.singletonList(line);
-    }
-
-    private List<String> collectLoreFromCollection(Collection<?> collection) {
-        List<String> lines = new ArrayList<>();
-        for (Object entry : collection) {
-            String line = normalizeLoreEntry(entry);
-            if (line != null) {
-                lines.add(line);
-            }
-        }
-        return lines;
-    }
-
-    private String normalizeLoreEntry(Object entry) {
-        if (entry == null) {
-            return null;
-        }
-        String line = entry.toString();
-        return line.isBlank() ? null : line;
-    }
-
-    private void applyCustomModelData(ItemMeta meta, String basePath) {
-        if (!config().contains(basePath + ".custom-model-data")) {
-            return;
-        }
-        Integer customModelData = parseCustomModelData(config().get(basePath + ".custom-model-data"));
-        if (customModelData != null) {
-            meta.setCustomModelData(customModelData);
-        }
-    }
-
-    private Integer parseCustomModelData(Object rawValue) {
-        if (rawValue instanceof Number number) {
-            return number.intValue();
-        }
-        if (rawValue instanceof String text && !text.isBlank()) {
-            try {
-                return Integer.parseInt(text.trim());
-            } catch (NumberFormatException ignored) {
-                return null;
-            }
-        }
-        return null;
-    }
-
-    private void placeBackButton(Inventory inv, String path, String action) {
-        if (!isEnabled(path)) {
-            return;
-        }
-        String materialName = config().getString(path + ".material", "ARROW");
-        Material material = Material.matchMaterial(materialName);
-        if (material == null) {
-            material = Material.ARROW;
-        }
-        ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
-        if (meta == null) {
-            return;
-        }
-
-        String name = config().getString(path + ".name", "&cBack");
-        meta.setDisplayName(plugin.colorize(name));
-
-        List<String> lore = config().getStringList(path + ".lore").stream()
-                .map(plugin::colorize)
-                .collect(Collectors.toList());
-        if (!lore.isEmpty()) {
-            meta.setLore(lore);
-        }
-
-        meta.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, action);
-        applyItemMetaCustomizations(meta, path);
-        item.setItemMeta(meta);
-        int slot = config().getInt(path + ".slot", inv.getSize() - 1);
-        inv.setItem(slot, item);
-    }
-
-
-    private Integer findAvailableSlot(Inventory inv,
-                                      int preferred,
-                                      Set<Integer> reservedSlots) {
-        int[] offsets = {0, -1, 1, -2, 2, -3, 3, -4, 4};
-        for (int offset : offsets) {
-            int candidate = preferred + offset;
-            if (isSlotAvailable(inv, candidate, reservedSlots)) {
-                return candidate;
-            }
-        }
-        plugin.getLogger().warning("Unable to place pagination control; no free slot near " + preferred);
-        return null;
-    }
-
-    private boolean isSlotAvailable(Inventory inv, int candidate, Set<Integer> reservedSlots) {
-        if (candidate < 0 || candidate >= inv.getSize()) {
-            return false;
-        }
-        if (reservedSlots.contains(candidate)) {
-            return false;
-        }
-        ItemStack existing = inv.getItem(candidate);
-        return existing == null || isDecorationItem(existing);
-    }
-
-    private boolean isDecorationItem(ItemStack existing) {
-        ItemMeta meta = existing.getItemMeta();
-        return meta != null && meta.getPersistentDataContainer().has(decorationKey, PersistentDataType.STRING);
-    }
-
-    private String summarizeCommand(String command) {
-        if (command == null || command.isBlank()) {
-            return "Console";
-        }
-
-        String trimmed = command.trim();
-        if (trimmed.startsWith("/")) {
-            trimmed = trimmed.substring(1);
-        }
-
-        String[] parts = trimmed.split("\\s+");
-        if (parts.length >= 3 && parts[0].equalsIgnoreCase("give")) {
-            String item = parts[2].replace("%player%", "@p");
-            int amount = 1;
-            if (parts.length >= 4) {
-                try {
-                    amount = Integer.parseInt(parts[3]);
-                } catch (NumberFormatException ignored) {
-                    amount = 1;
-                }
-            }
-            return item + "/" + amount;
-        }
-
-        String main = parts[0];
-        if (parts.length > 1) {
-            return main + " " + parts[1].replace("%player%", "@p");
-        }
-        return main;
+        paginationBuilder.addPaginationButtons(inv, settings, currentPage, totalPages);
     }
 
     @Override
@@ -571,7 +240,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             if (receiver != null && !receiver.trim().isEmpty() && receiver.matches("^[a-zA-Z0-9_]{1,16}$")) {
                 headMeta.setOwningPlayer(Bukkit.getOfflinePlayer(receiver));
             }
-            applyItemMetaCustomizations(headMeta, "gui.sent-mail-view.items.receiver-head", false);
+            itemStyler.apply(headMeta, "gui.sent-mail-view.items.receiver-head", false);
             head.setItemMeta(headMeta);
             inv.setItem(config().getInt("gui.sent-mail-view.items.receiver-head.slot"), head);
         }
@@ -584,7 +253,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                     .map(line -> plugin.colorize("&f" + line))
                     .collect(Collectors.toList());
             messageMeta.setLore(messageLore);
-            applyItemMetaCustomizations(messageMeta, "gui.sent-mail-view.items.message", false);
+            itemStyler.apply(messageMeta, "gui.sent-mail-view.items.message", false);
             messageItem.setItemMeta(messageMeta);
             inv.setItem(config().getInt("gui.sent-mail-view.items.message.slot"), messageItem);
         }
@@ -600,7 +269,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                 1,
                 slotsPerPage);
 
-        placeBackButton(inv, "gui.sent-mail-view.items.back-button", "sent-mail-view-back");
+        navigationHelper.placeBackButton(inv, "gui.sent-mail-view.items.back-button", "sent-mail-view-back");
 
         if (viewer.hasPermission(config().getString("settings.permissions.delete"))
                 && isEnabled("gui.sent-mail-view.items.delete-button")) {
@@ -612,7 +281,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                     .collect(Collectors.toList()));
             deleteMeta.getPersistentDataContainer().set(mailIdKey,
                     PersistentDataType.STRING, mailId);
-            applyItemMetaCustomizations(deleteMeta, "gui.sent-mail-view.items.delete-button");
+            itemStyler.apply(deleteMeta, "gui.sent-mail-view.items.delete-button");
             deleteButton.setItemMeta(deleteMeta);
             inv.setItem(config().getInt("gui.sent-mail-view.items.delete-button.slot"), deleteButton);
         }
@@ -645,7 +314,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             if (sender != null && !sender.trim().isEmpty() && sender.matches("^[a-zA-Z0-9_]{1,16}$")) {
                 headMeta.setOwningPlayer(Bukkit.getOfflinePlayer(sender));
             }
-            applyItemMetaCustomizations(headMeta, "gui.mail-view.items.sender-head", false);
+            itemStyler.apply(headMeta, "gui.mail-view.items.sender-head", false);
             head.setItemMeta(headMeta);
             inv.setItem(config().getInt("gui.mail-view.items.sender-head.slot"), head);
         }
@@ -658,7 +327,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                     .map(line -> plugin.colorize("&f" + line))
                     .collect(Collectors.toList());
             messageMeta.setLore(messageLore);
-            applyItemMetaCustomizations(messageMeta, "gui.mail-view.items.message", false);
+            itemStyler.apply(messageMeta, "gui.mail-view.items.message", false);
             messageItem.setItemMeta(messageMeta);
             inv.setItem(config().getInt("gui.mail-view.items.message.slot"), messageItem);
         }
@@ -705,7 +374,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                     .collect(Collectors.toList()));
             claimMeta.getPersistentDataContainer().set(mailIdKey,
                     PersistentDataType.STRING, mailId);
-            applyItemMetaCustomizations(claimMeta, "gui.mail-view.items.claim-button");
+            itemStyler.apply(claimMeta, "gui.mail-view.items.claim-button");
             claimButton.setItemMeta(claimMeta);
             inv.setItem(claimSlot, claimButton);
         }
@@ -719,12 +388,12 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                     .collect(Collectors.toList()));
             dismissMeta.getPersistentDataContainer().set(mailIdKey,
                     PersistentDataType.STRING, mailId);
-            applyItemMetaCustomizations(dismissMeta, "gui.mail-view.items.dismiss-button");
+            itemStyler.apply(dismissMeta, "gui.mail-view.items.dismiss-button");
             dismissButton.setItemMeta(dismissMeta);
             inv.setItem(dismissSlot, dismissButton);
         }
 
-        placeBackButton(inv, "gui.mail-view.items.back-button", "mail-view-back");
+        navigationHelper.placeBackButton(inv, "gui.mail-view.items.back-button", "mail-view-back");
 
         return inv;
     }
@@ -732,267 +401,22 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
 
     @Override
     public Inventory createMailCreation(Player viewer) {
-        MailCreationSession session = plugin.getMailSessions()
-                .computeIfAbsent(viewer.getUniqueId(), key -> new MailCreationSession());
-        ensureSessionDefaults(session);
-
-        int size = config().getInt("gui.create-mail.size");
-        Inventory inv = Bukkit.createInventory(null, size, plugin.colorize(config().getString("gui.create-mail.title")));
-        addDecorations(inv, "gui.create-mail");
-
-        addReceiverHead(inv, viewer, session);
-        addMessagePaper(inv, session);
-        addItemsChest(inv, viewer);
-        addSendButton(inv);
-        addAdminControls(inv, viewer, session);
-
-        placeBackButton(inv, "gui.create-mail.items.back-button", "create-back");
-
-        return inv;
+        return mailCreationBuilder.createMailCreation(viewer);
     }
 
-    private void addReceiverHead(Inventory inv, Player viewer, MailCreationSession session) {
-        if (!isEnabled("gui.create-mail.items.receiver-head")) {
-            return;
-        }
-        ItemStack head = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.receiver-head.material")));
-        SkullMeta headMeta = (SkullMeta) head.getItemMeta();
-        if (headMeta == null) {
-            return;
-        }
-        headMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.receiver-head.name")));
-        List<String> headLore = viewer.hasPermission(config().getString("settings.admin-permission")) ?
-                config().getStringList("gui.create-mail.items.receiver-head.adminlore") :
-                config().getStringList("gui.create-mail.items.receiver-head.lore");
-        List<String> lore = headLore.stream().map(plugin::colorize).collect(Collectors.toList());
-        if (session.getReceiver() != null) {
-            lore.add(plugin.colorize(config().getString("gui.create-mail.items.receiver-head.current-receiver-format")
-                    .replace("%receiver%", session.getReceiver())));
-        }
-        headMeta.setLore(lore);
-        applyItemMetaCustomizations(headMeta, "gui.create-mail.items.receiver-head", false);
-        head.setItemMeta(headMeta);
-        inv.setItem(config().getInt("gui.create-mail.items.receiver-head.slot"), head);
-    }
-
-    private void addMessagePaper(Inventory inv, MailCreationSession session) {
-        if (!isEnabled("gui.create-mail.items.message-paper")) {
-            return;
-        }
-        ItemStack paper = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.message-paper.material")));
-        ItemMeta paperMeta = paper.getItemMeta();
-        if (paperMeta == null) {
-            return;
-        }
-        paperMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.message-paper.name")));
-        List<String> paperLore = config().getStringList("gui.create-mail.items.message-paper.lore").stream()
-                .map(plugin::colorize)
-                .collect(Collectors.toList());
-        if (session.getMessage() != null) {
-            paperLore.add(plugin.colorize(config().getString("gui.create-mail.items.message-paper.current-message-prefix")));
-            paperLore.addAll(Arrays.stream(session.getMessage().split("\n"))
-                    .map(line -> plugin.colorize(config().getString("gui.create-mail.items.message-paper.message-line-format") + line))
-                    .collect(Collectors.toList()));
-        }
-        paperMeta.setLore(paperLore);
-        applyItemMetaCustomizations(paperMeta, "gui.create-mail.items.message-paper");
-        paper.setItemMeta(paperMeta);
-        inv.setItem(config().getInt("gui.create-mail.items.message-paper.slot"), paper);
-    }
-
-    private void addItemsChest(Inventory inv, Player viewer) {
-        if (!isEnabled("gui.create-mail.items.items-chest")) {
-            return;
-        }
-        int chestSlot = config().getInt("gui.create-mail.items.items-chest.slot");
-        if (!viewer.hasPermission(config().getString("settings.permissions.add-items"))) {
-            inv.setItem(chestSlot, createDisabledFiller());
-            return;
-        }
-        ItemStack chest = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.items-chest.material")));
-        ItemMeta chestMeta = chest.getItemMeta();
-        if (chestMeta == null) {
-            return;
-        }
-        chestMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.items-chest.name")));
-        chestMeta.setLore(config().getStringList("gui.create-mail.items.items-chest.lore").stream()
-                .map(plugin::colorize)
-                .collect(Collectors.toList()));
-        applyItemMetaCustomizations(chestMeta, "gui.create-mail.items.items-chest");
-        chest.setItemMeta(chestMeta);
-        inv.setItem(chestSlot, chest);
-    }
-
-    private void addSendButton(Inventory inv) {
-        if (!isEnabled("gui.create-mail.items.send-button")) {
-            return;
-        }
-        ItemStack sendButton = new ItemStack(Material.valueOf(config().getString("gui.create-mail.items.send-button.material")));
-        ItemMeta sendMeta = sendButton.getItemMeta();
-        if (sendMeta == null) {
-            return;
-        }
-        sendMeta.setDisplayName(plugin.colorize(config().getString("gui.create-mail.items.send-button.name")));
-        sendMeta.setLore(config().getStringList("gui.create-mail.items.send-button.lore").stream()
-                .map(plugin::colorize)
-                .collect(Collectors.toList()));
-        applyItemMetaCustomizations(sendMeta, "gui.create-mail.items.send-button");
-        sendButton.setItemMeta(sendMeta);
-        inv.setItem(config().getInt("gui.create-mail.items.send-button.slot"), sendButton);
-    }
-
-    private void addAdminControls(Inventory inv, Player viewer, MailCreationSession session) {
-        int commandSlot = config().getInt("gui.create-mail.items.command-block.slot");
-        int clockSlot = config().getInt("gui.create-mail.items.schedule-clock.slot");
-        boolean commandEnabled = isEnabled("gui.create-mail.items.command-block");
-        boolean clockEnabled = isEnabled("gui.create-mail.items.schedule-clock");
-        boolean isAdmin = viewer.hasPermission(config().getString("settings.admin-permission"));
-
-        if (isAdmin) {
-            if (commandEnabled) {
-                inv.setItem(commandSlot, createCommandItemsButton(session));
-            }
-            if (clockEnabled) {
-                inv.setItem(clockSlot, buildScheduleClock(session));
-            }
-            return;
-        }
-
-        if (commandEnabled) {
-            inv.setItem(commandSlot, createDisabledFiller());
-        }
-        if (clockEnabled) {
-            inv.setItem(clockSlot, createDisabledFiller());
-        }
-    }
-
-    private ItemStack buildScheduleClock(MailCreationSession session) {
-        String basePath = "gui.create-mail.items.schedule-clock";
-        ItemStack clock = new ItemStack(Material.valueOf(config().getString(basePath + ".material")));
-        ItemMeta clockMeta = clock.getItemMeta();
-        if (clockMeta == null) {
-            return clock;
-        }
-
-        clockMeta.setDisplayName(plugin.colorize(config().getString(basePath + ".name")));
-
-        String scheduleTime = session.getScheduleDate() != null ?
-                new java.text.SimpleDateFormat("yyyy:MM:dd:HH:mm").format(new java.util.Date(session.getScheduleDate())) :
-                "Not set";
-        String expireTime = session.getExpireDate() != null ?
-                new java.text.SimpleDateFormat("yyyy:MM:dd:HH:mm").format(new java.util.Date(session.getExpireDate())) :
-                "Not set";
-
-        List<String> lore = config().getStringList(basePath + ".lore").stream()
-                .map(line -> line.replace("%schedule_time%", scheduleTime).replace("%expire_time%", expireTime))
-                .map(plugin::colorize)
-                .collect(Collectors.toList());
-        clockMeta.setLore(lore);
-        applyItemMetaCustomizations(clockMeta, basePath);
-        clock.setItemMeta(clockMeta);
-        return clock;
-    }
-
-    @Override
+@Override
     public Inventory createItemsEditor(Player viewer) {
-        int size = config().getInt("gui.items.size");
-        Inventory inv = Bukkit.createInventory(null, size, plugin.colorize(config().getString("gui.items.title")));
-
-        MailCreationSession session = plugin.getMailSessions().get(viewer.getUniqueId());
-        if (session != null) {
-            session.getItems().forEach(item -> inv.addItem(item.clone()));
-        }
-
-        if (isEnabled("gui.items.items.save-button")) {
-            ItemStack saveButton = new ItemStack(Material.valueOf(config().getString("gui.items.items.save-button.material")));
-            ItemMeta saveMeta = saveButton.getItemMeta();
-            saveMeta.setDisplayName(plugin.colorize(config().getString("gui.items.items.save-button.name")));
-            saveMeta.setLore(config().getStringList("gui.items.items.save-button.lore").stream()
-                    .map(plugin::colorize)
-                    .collect(Collectors.toList()));
-            applyItemMetaCustomizations(saveMeta, "gui.items.items.save-button");
-            saveButton.setItemMeta(saveMeta);
-            inv.setItem(config().getInt("gui.items.items.save-button.slot"), saveButton);
-        }
-
-        placeBackButton(inv, "gui.items.items.back-button", "items-back");
-        return inv;
+        return mailCreationBuilder.createItemsEditor(viewer);
     }
 
-    @Override
+@Override
     public Inventory createCommandItemsEditor(Player viewer) {
-        MailCreationSession session = plugin.getMailSessions()
-                .computeIfAbsent(viewer.getUniqueId(), key -> new MailCreationSession());
-        ensureSessionDefaults(session);
-
-        String base = "gui.command-items-editor";
-        int size = config().getInt(base + ".size", 45);
-        Inventory inv = Bukkit.createInventory(null, size, plugin.colorize(config().getString(base + ".title", "Command Items")));
-        addDecorations(inv, base);
-
-        List<CommandItem> commandItems = session.getCommandItems();
-        List<Integer> slots = config().getIntegerList(base + ".items.command-item.slots");
-        for (int i = 0; i < commandItems.size() && i < slots.size(); i++) {
-            ItemStack stack = buildCommandItemEditorEntry(commandItems.get(i), i);
-            inv.setItem(slots.get(i), stack);
-        }
-
-        if (isEnabled(base + ".items.add-button")) {
-            ItemStack addButton = buildEditorStaticButton(base + ".items.add-button", "add");
-            inv.setItem(config().getInt(base + ".items.add-button.slot", size - 5), addButton);
-        }
-
-        if (isEnabled(base + ".items.back-button")) {
-            ItemStack backButton = buildEditorStaticButton(base + ".items.back-button", "back");
-            inv.setItem(config().getInt(base + ".items.back-button.slot", size - 1), backButton);
-        }
-
-        return inv;
+        return mailCreationBuilder.createCommandItemsEditor(viewer);
     }
 
-    @Override
+@Override
     public Inventory createCommandItemCreator(Player viewer) {
-        MailCreationSession session = plugin.getMailSessions()
-                .computeIfAbsent(viewer.getUniqueId(), key -> new MailCreationSession());
-        ensureSessionDefaults(session);
-        if (session.getCommandItemDraft() == null) {
-            session.setCommandItemDraft(new CommandItem.Builder());
-        }
-
-        CommandItem.Builder draft = session.getCommandItemDraft();
-        String base = "gui.command-item-creator";
-        int size = config().getInt(base + ".size", 54);
-        Inventory inv = Bukkit.createInventory(null, size, plugin.colorize(config().getString(base + ".title", "Create Command Item")));
-        addDecorations(inv, base);
-
-        Map<String, String> placeholders = new HashMap<>();
-        placeholders.put("%material%", draft.materialKey());
-        placeholders.put("%name%", draft.displayName());
-        placeholders.put("%lore_count%", String.valueOf(draft.lore().size()));
-        placeholders.put("%command_count%", String.valueOf(draft.commands().size()));
-        placeholders.put("%custom_model_data%", draft.customModelData() != null
-                ? String.valueOf(draft.customModelData())
-                : "None");
-
-        placeCreatorButton(inv, base + ".items.material-selector", "material", placeholders, draft);
-        placeCreatorButton(inv, base + ".items.name-editor", "name", placeholders, draft);
-        placeCreatorButton(inv, base + ".items.lore-editor", "lore", placeholders, draft);
-        placeCreatorButton(inv, base + ".items.commands-editor", "command", placeholders, draft);
-        placeCreatorButton(inv, base + ".items.custom-model-editor", "custom-model", placeholders, draft);
-
-        // Preview item
-        int previewSlot = config().getInt(base + ".items.preview.slot", size / 2);
-        ItemStack preview = draft.buildPreviewItem(plugin);
-        inv.setItem(previewSlot, preview);
-
-        if (isEnabled(base + ".items.save-button")) {
-            ItemStack save = buildEditorStaticButton(base + ".items.save-button", "save");
-            inv.setItem(config().getInt(base + ".items.save-button.slot", size - 6), save);
-        }
-
-        placeBackButton(inv, base + ".items.back-button", "command-creator-back");
-
-        return inv;
+        return mailCreationBuilder.createCommandItemCreator(viewer);
     }
 
     private void addCreateMailButton(Inventory inv, Player viewer, Player target) {
@@ -1019,7 +443,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
 
         bookMeta.setLore(bookLore.stream().map(plugin::colorize).collect(Collectors.toList()));
-        applyItemMetaCustomizations(bookMeta, "gui.main.items.create-mail");
+        itemStyler.apply(bookMeta, "gui.main.items.create-mail");
         createBook.setItemMeta(bookMeta);
         inv.setItem(config().getInt("gui.main.items.create-mail.slot"), createBook);
     }
@@ -1034,7 +458,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         sentMailMeta.setLore(config().getStringList("gui.main.items.sent-mail.lore").stream()
                 .map(plugin::colorize)
                 .collect(Collectors.toList()));
-        applyItemMetaCustomizations(sentMailMeta, "gui.main.items.sent-mail");
+        itemStyler.apply(sentMailMeta, "gui.main.items.sent-mail");
         sentMailButton.setItemMeta(sentMailMeta);
         inv.setItem(config().getInt("gui.main.items.sent-mail.slot"), sentMailButton);
     }
@@ -1049,7 +473,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         backMeta.setLore(config().getStringList("gui.sent-mail.items.back-button.lore").stream()
                 .map(plugin::colorize)
                 .collect(Collectors.toList()));
-        applyItemMetaCustomizations(backMeta, "gui.sent-mail.items.back-button");
+        itemStyler.apply(backMeta, "gui.sent-mail.items.back-button");
         backButton.setItemMeta(backMeta);
         inv.setItem(config().getInt("gui.sent-mail.items.back-button.slot"), backButton);
     }
@@ -1106,19 +530,19 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             reservedSlots.add(config().getInt("gui.main.items.sent-mail.slot"));
         }
 
-        PaginationSettings settings = new PaginationSettings(
+        PaginationBuilder.Settings settings = new PaginationBuilder.Settings(
                 "gui.main.items.pagination",
                 reservedSlots,
                 "mailbox-page-prev",
                 "mailbox-page-next",
                 (meta, type) -> {
-                    if (type != PaginationButtonType.INDICATOR) {
+                    if (type != PaginationBuilder.PaginationButtonType.INDICATOR) {
                         meta.getPersistentDataContainer().set(paginationTargetKey, PersistentDataType.STRING, targetName);
                     }
                 }
         );
 
-        addPaginationButtons(inv, settings, currentPage, totalPages);
+        paginationBuilder.addPaginationButtons(inv, settings, currentPage, totalPages);
     }
 
     private void loadSentMails(Player viewer, Inventory inv) {
@@ -1170,19 +594,19 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             reservedSlots.add(config().getInt("gui.sent-mail.items.back-button.slot"));
         }
 
-        PaginationSettings settings = new PaginationSettings(
+        PaginationBuilder.Settings settings = new PaginationBuilder.Settings(
                 "gui.sent-mail.items.pagination",
                 reservedSlots,
                 "sent-page-prev",
                 "sent-page-next",
                 (meta, type) -> {
-                    if (type != PaginationButtonType.INDICATOR) {
+                    if (type != PaginationBuilder.PaginationButtonType.INDICATOR) {
                         meta.getPersistentDataContainer().set(paginationTargetKey, PersistentDataType.STRING, targetPlayerName);
                     }
                 }
         );
 
-        addPaginationButtons(inv, settings, currentPage, totalPages);
+        paginationBuilder.addPaginationButtons(inv, settings, currentPage, totalPages);
     }
 
     private ItemStack createMailItem(MailRecord record) {
@@ -1216,7 +640,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
 
         meta.setLore(lore);
-        applyItemMetaCustomizations(meta, itemPath, false);
+        itemStyler.apply(meta, itemPath, false);
         meta.getPersistentDataContainer().set(mailIdKey, PersistentDataType.STRING, record.id());
         mailItem.setItemMeta(meta);
         return mailItem;
@@ -1247,7 +671,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                         .replace("%expire%", formatDate(expireAt))))
                 .collect(Collectors.toList());
         meta.setLore(lore);
-        applyItemMetaCustomizations(meta, "gui.sent-mail.items.sent-mail-display", false);
+        itemStyler.apply(meta, "gui.sent-mail.items.sent-mail-display", false);
         meta.getPersistentDataContainer().set(mailIdKey, PersistentDataType.STRING, record.id());
         item.setItemMeta(meta);
         return item;
@@ -1310,23 +734,11 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                 meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "decorationPath"),
                         PersistentDataType.STRING, path);
             }
-            applyItemMetaCustomizations(meta, path);
+            itemStyler.apply(meta, path);
             decorItem.setItemMeta(meta);
             for (int slot : slots) {
                 inv.setItem(slot, decorItem.clone());
             }
-        }
-    }
-
-    private void ensureSessionDefaults(MailCreationSession session) {
-        if (session.getCommands() == null) {
-            session.setCommands(new ArrayList<>());
-        }
-        if (session.getItems() == null) {
-            session.setItems(new ArrayList<>());
-        }
-        if (session.getCommandItems() == null) {
-            session.setCommandItems(new ArrayList<>());
         }
     }
 
@@ -1336,290 +748,6 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
 
     private boolean isEnabled(String path) {
         return config().getBoolean(path + ".enabled", true);
-    }
-
-    private ItemStack createDisabledFiller() {
-        ConfigurationSection decorSection = config().getConfigurationSection("gui.create-mail.decoration");
-        if (decorSection != null) {
-            for (String key : decorSection.getKeys(false)) {
-                String base = "gui.create-mail.decoration." + key;
-                String materialName = config().getString(base + ".material");
-                if (materialName == null) {
-                    continue;
-                }
-                try {
-                    Material material = Material.valueOf(materialName);
-                    ItemStack filler = new ItemStack(material);
-                    ItemMeta meta = filler.getItemMeta();
-                    meta.setDisplayName(plugin.colorize(config().getString(base + ".name", " ")));
-                    List<String> lore = config().getStringList(base + ".lore").stream()
-                            .map(plugin::colorize)
-                            .collect(Collectors.toList());
-                    meta.setLore(lore);
-                    filler.setItemMeta(meta);
-                    return filler;
-                } catch (IllegalArgumentException ignored) {
-                    // try next decoration entry
-                }
-            }
-        }
-
-        ItemStack fallback = new ItemStack(Material.BLACK_STAINED_GLASS_PANE);
-        ItemMeta meta = fallback.getItemMeta();
-        meta.setDisplayName(" ");
-        fallback.setItemMeta(meta);
-        return fallback;
-    }
-
-    private ItemStack createCommandItemsButton(MailCreationSession session) {
-        String basePath = "gui.create-mail.items.command-block";
-        ItemStack item = new ItemStack(resolveMaterial(basePath + ".material", Material.COMMAND_BLOCK));
-        ItemMeta meta = item.getItemMeta();
-        if (meta == null) {
-            return item;
-        }
-
-        applyCommandItemsTitle(meta, basePath, session);
-        meta.setLore(buildCommandItemsLore(session, basePath));
-        applyItemMetaCustomizations(meta, basePath, false);
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    private void applyCommandItemsTitle(ItemMeta meta, String basePath, MailCreationSession session) {
-        String name = config().getString(basePath + ".name", "&6Command Items");
-        String formatted = name.replace("%count%", String.valueOf(session.getCommandItems().size()));
-        meta.setDisplayName(plugin.colorize(formatted));
-    }
-
-    private List<String> buildCommandItemsLore(MailCreationSession session, String basePath) {
-        int count = session.getCommandItems().size();
-        List<String> lore = config().getStringList(basePath + ".lore").stream()
-                .map(line -> line.replace("%count%", String.valueOf(count)))
-                .map(plugin::colorize)
-                .collect(Collectors.toList());
-        if (!session.getCommandItems().isEmpty()) {
-            List<String> summaries = session.getCommandItems().stream()
-                    .map(this::formatCommandItemSummary)
-                    .collect(Collectors.toList());
-            appendDetailLines(lore, "&7Configured actions:", summaries, 4, false);
-        }
-        return lore;
-    }
-
-    private String formatCommandItemSummary(CommandItem commandItem) {
-        String first = commandItem.commands().isEmpty() ? "" : commandItem.commands().get(0);
-        String summary = first.isEmpty() ? "No command" : Optional.ofNullable(summarizeCommand(first)).orElse(first);
-        String display = commandItem.displayName() != null ? commandItem.displayName() : "Action";
-        return display + " → " + summary;
-    }
-
-    private Material resolveMaterial(String materialPath, Material fallback) {
-        String materialKey = config().getString(materialPath);
-        if (materialKey == null || materialKey.isBlank()) {
-            return fallback;
-        }
-        Material match = Material.matchMaterial(materialKey);
-        return match != null ? match : fallback;
-    }
-
-    private ItemStack buildCommandItemEditorEntry(CommandItem commandItem, int index) {
-        String base = "gui.command-items-editor.items.command-item";
-        ItemStack stack = commandItem.toPreviewItem(plugin);
-        ItemMeta meta = stack.getItemMeta();
-        if (meta == null) {
-            return stack;
-        }
-
-        List<String> lore = buildCommandItemEditorLore(commandItem, base, meta);
-        meta.setLore(lore);
-        if (!meta.hasCustomModelData()) {
-            applyItemMetaCustomizations(meta, base, false);
-        }
-        meta.getPersistentDataContainer().set(commandItemIndexKey, PersistentDataType.INTEGER, index);
-        stack.setItemMeta(meta);
-        return stack;
-    }
-
-    private List<String> buildCommandItemEditorLore(CommandItem commandItem, String base, ItemMeta existingMeta) {
-        List<String> lore = new ArrayList<>();
-        if (existingMeta.hasLore() && existingMeta.getLore() != null) {
-            lore.addAll(existingMeta.getLore());
-        }
-        appendCommandDetails(lore, base, commandItem);
-        appendActionInstructions(lore, base);
-        return lore;
-    }
-
-    private void appendCommandDetails(List<String> lore, String base, CommandItem commandItem) {
-        String commandHeader = config().getString(base + ".command-header", "&7Commands:");
-        appendDetailLines(lore, commandHeader, commandItem.commands(), 5, true);
-    }
-
-    private void appendActionInstructions(List<String> lore, String base) {
-        List<String> actionLore = config().getStringList(base + ".lore");
-        if (actionLore.isEmpty()) {
-            return;
-        }
-        if (!lore.isEmpty()) {
-            lore.add(plugin.colorize("&7"));
-        }
-        lore.addAll(actionLore.stream()
-                .map(plugin::colorize)
-                .collect(Collectors.toList()));
-    }
-
-    private ItemStack buildEditorStaticButton(String path, String action) {
-        String materialName = config().getString(path + ".material", "BARRIER");
-        Material material = Material.matchMaterial(materialName);
-        if (material == null) {
-            material = Material.BARRIER;
-        }
-        ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(plugin.colorize(config().getString(path + ".name", "&c" + action)));
-            List<String> lore = config().getStringList(path + ".lore").stream()
-                    .map(plugin::colorize)
-                    .collect(Collectors.toList());
-            meta.setLore(lore);
-            applyItemMetaCustomizations(meta, path);
-            meta.getPersistentDataContainer().set(commandItemActionKey, PersistentDataType.STRING, action);
-            item.setItemMeta(meta);
-        }
-        return item;
-    }
-
-    private void placeCreatorButton(Inventory inv,
-                                    String path,
-                                    String action,
-                                    Map<String, String> placeholders,
-                                    CommandItem.Builder draft) {
-        if (!isEnabled(path)) {
-            return;
-        }
-        int slot = config().getInt(path + ".slot", 0);
-        String materialName = config().getString(path + ".material", "BOOK");
-        Material material = Material.matchMaterial(materialName);
-        if (material == null) {
-            material = Material.BOOK;
-        }
-        ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
-            String name = config().getString(path + ".name", "&eEdit");
-            meta.setDisplayName(plugin.colorize(applyPlaceholders(name, placeholders)));
-
-            List<String> loreTemplate = config().getStringList(path + ".lore");
-            List<String> lore = loreTemplate.stream()
-                    .map(line -> applyDraftPlaceholders(line, placeholders, draft))
-                    .map(plugin::colorize)
-                    .collect(Collectors.toList());
-
-            if ("lore".equals(action) && !draft.lore().isEmpty()) {
-                appendDetailLines(lore, "&7Lore:", draft.lore(), 10, false);
-            } else if ("command".equals(action) && !draft.commands().isEmpty()) {
-                appendDetailLines(lore, "&7Commands:", draft.commands(), 10, true);
-            } else if ("custom-model".equals(action)) {
-                String value = draft.customModelData() != null ? String.valueOf(draft.customModelData()) : "None";
-                lore.add(plugin.colorize("&7Current: &f" + value));
-            }
-
-            if (!lore.isEmpty()) {
-                meta.setLore(lore);
-            }
-
-            meta.getPersistentDataContainer().set(commandItemActionKey, PersistentDataType.STRING, action);
-            applyItemMetaCustomizations(meta, path);
-            item.setItemMeta(meta);
-        }
-        inv.setItem(slot, item);
-    }
-
-    private String applyDraftPlaceholders(String input,
-                                          Map<String, String> generic,
-                                          CommandItem.Builder draft) {
-        String result = applyPlaceholders(input, generic);
-        result = result.replace("%material%", draft.materialKey());
-        result = result.replace("%name%", draft.displayName());
-        result = result.replace("%lore_count%", String.valueOf(draft.lore().size()));
-        result = result.replace("%command_count%", String.valueOf(draft.commands().size()));
-        result = result.replace("%custom_model_data%", draft.customModelData() != null
-                ? String.valueOf(draft.customModelData())
-                : "None");
-        if (!draft.commands().isEmpty()) {
-            result = result.replace("%first_command%", draft.commands().get(0));
-            result = result.replace("%summary%", summarizeCommand(draft.commands().get(0)));
-        } else {
-            result = result.replace("%first_command%", "");
-            result = result.replace("%summary%", "");
-        }
-        return result;
-    }
-
-    private String applyPlaceholders(String input, Map<String, String> placeholders) {
-        if (input == null) {
-            return "";
-        }
-        String result = input;
-        for (Map.Entry<String, String> entry : placeholders.entrySet()) {
-            result = result.replace(entry.getKey(), entry.getValue());
-        }
-        return result;
-    }
-
-    private Map<String, String> createCommandItemPlaceholders(CommandItem commandItem) {
-        Map<String, String> placeholders = new HashMap<>();
-
-        int commandCount = commandItem.commands().size();
-        int loreCount = commandItem.lore().size();
-        String firstCommand = commandCount > 0 ? commandItem.commands().get(0) : "";
-        String summary = firstCommand.isEmpty() ? "" : Optional.ofNullable(summarizeCommand(firstCommand)).orElse(firstCommand);
-
-        placeholders.put("%commands%", formatList(commandItem.commands(), 3, true));
-        placeholders.put("%command_count%", String.valueOf(commandCount));
-        placeholders.put("%total%", String.valueOf(commandCount));
-        placeholders.put("%first_command%", firstCommand);
-        placeholders.put("%summary%", summary);
-        placeholders.put("%lore_count%", String.valueOf(loreCount));
-        placeholders.put("%lore_values%", formatList(commandItem.lore(), 3, false));
-        placeholders.put("%first_lore%", loreCount > 0 ? commandItem.lore().get(0) : "");
-        placeholders.put("%custom_model_data%", commandItem.customModelData() != null
-                ? String.valueOf(commandItem.customModelData())
-                : "None");
-        return placeholders;
-    }
-
-    private String formatList(List<String> values, int limit, boolean summarizeCommands) {
-        if (values == null || values.isEmpty()) {
-            return "None";
-        }
-        String joined = values.stream()
-                .limit(limit)
-                .map(value -> summarizeCommands ? Optional.ofNullable(summarizeCommand(value)).orElse(value) : value)
-                .collect(Collectors.joining(", "));
-        return values.size() > limit ? joined + ", …" : joined;
-    }
-
-    private void appendDetailLines(List<String> target,
-                                   String header,
-                                   List<String> values,
-                                   int limit,
-                                   boolean summarizeCommands) {
-        if (values == null || values.isEmpty()) {
-            return;
-        }
-        if (!target.isEmpty()) {
-            target.add(plugin.colorize("&7"));
-        }
-        target.add(plugin.colorize(header));
-        for (String value : values.stream().limit(limit).toList()) {
-            String text = summarizeCommands ? Optional.ofNullable(summarizeCommand(value)).orElse(value) : value;
-            target.add(plugin.colorize("&f• " + text));
-        }
-        if (values.size() > limit) {
-            target.add(plugin.colorize("&7…"));
-        }
     }
 
 }
