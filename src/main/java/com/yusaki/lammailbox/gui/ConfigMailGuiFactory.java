@@ -99,6 +99,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                             .replace("%summary%", summary)))
                     .collect(Collectors.toList());
             meta.setLore(lore);
+            applyItemMetaCustomizations(meta, basePath);
             stack.setItemMeta(meta);
         }
         return stack;
@@ -171,6 +172,12 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
 
                 base.setItemMeta(meta);
             }
+        }
+
+        ItemMeta finalMeta = base.getItemMeta();
+        if (finalMeta != null && !finalMeta.hasCustomModelData()) {
+            applyItemMetaCustomizations(finalMeta, commandPath, false);
+            base.setItemMeta(finalMeta);
         }
 
         // User-created CommandItems are returned as-is
@@ -313,6 +320,10 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
 
 
     private void applyItemMetaCustomizations(ItemMeta meta, String basePath) {
+        applyItemMetaCustomizations(meta, basePath, true);
+    }
+
+    private void applyItemMetaCustomizations(ItemMeta meta, String basePath, boolean allowLoreOverride) {
         if (meta == null || basePath == null || basePath.isEmpty()) {
             return;
         }
@@ -332,10 +343,13 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             }
         }
         if (!loreLines.isEmpty()) {
-            List<String> colorized = loreLines.stream()
-                    .map(plugin::colorize)
-                    .collect(Collectors.toList());
-            meta.setLore(colorized);
+            boolean hasExistingLore = meta.hasLore() && meta.getLore() != null && !meta.getLore().isEmpty();
+            if (allowLoreOverride || !hasExistingLore) {
+                List<String> colorized = loreLines.stream()
+                        .map(plugin::colorize)
+                        .collect(Collectors.toList());
+                meta.setLore(colorized);
+            }
         }
 
         if (config().contains(basePath + ".custom-model-data")) {
@@ -354,6 +368,38 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                 meta.setCustomModelData(customModelData);
             }
         }
+    }
+
+    private void placeBackButton(Inventory inv, String path, String action) {
+        if (!isEnabled(path)) {
+            return;
+        }
+        String materialName = config().getString(path + ".material", "ARROW");
+        Material material = Material.matchMaterial(materialName);
+        if (material == null) {
+            material = Material.ARROW;
+        }
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null) {
+            return;
+        }
+
+        String name = config().getString(path + ".name", "&cBack");
+        meta.setDisplayName(plugin.colorize(name));
+
+        List<String> lore = config().getStringList(path + ".lore").stream()
+                .map(plugin::colorize)
+                .collect(Collectors.toList());
+        if (!lore.isEmpty()) {
+            meta.setLore(lore);
+        }
+
+        meta.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, action);
+        applyItemMetaCustomizations(meta, path);
+        item.setItemMeta(meta);
+        int slot = config().getInt(path + ".slot", inv.getSize() - 1);
+        inv.setItem(slot, item);
     }
 
 
@@ -479,6 +525,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             if (receiver != null && !receiver.trim().isEmpty() && receiver.matches("^[a-zA-Z0-9_]{1,16}$")) {
                 headMeta.setOwningPlayer(Bukkit.getOfflinePlayer(receiver));
             }
+            applyItemMetaCustomizations(headMeta, "gui.sent-mail-view.items.receiver-head", false);
             head.setItemMeta(headMeta);
             inv.setItem(config().getInt("gui.sent-mail-view.items.receiver-head.slot"), head);
         }
@@ -491,6 +538,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                     .map(line -> plugin.colorize("&f" + line))
                     .collect(Collectors.toList());
             messageMeta.setLore(messageLore);
+            applyItemMetaCustomizations(messageMeta, "gui.sent-mail-view.items.message", false);
             messageItem.setItemMeta(messageMeta);
             inv.setItem(config().getInt("gui.sent-mail-view.items.message.slot"), messageItem);
         }
@@ -506,6 +554,8 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                 1,
                 slotsPerPage);
 
+        placeBackButton(inv, "gui.sent-mail-view.items.back-button", "sent-mail-view-back");
+
         if (viewer.hasPermission(config().getString("settings.permissions.delete"))
                 && isEnabled("gui.sent-mail-view.items.delete-button")) {
             ItemStack deleteButton = new ItemStack(Material.valueOf(config().getString("gui.sent-mail-view.items.delete-button.material")));
@@ -516,6 +566,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                     .collect(Collectors.toList()));
             deleteMeta.getPersistentDataContainer().set(mailIdKey,
                     PersistentDataType.STRING, mailId);
+            applyItemMetaCustomizations(deleteMeta, "gui.sent-mail-view.items.delete-button");
             deleteButton.setItemMeta(deleteMeta);
             inv.setItem(config().getInt("gui.sent-mail-view.items.delete-button.slot"), deleteButton);
         }
@@ -548,6 +599,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             if (sender != null && !sender.trim().isEmpty() && sender.matches("^[a-zA-Z0-9_]{1,16}$")) {
                 headMeta.setOwningPlayer(Bukkit.getOfflinePlayer(sender));
             }
+            applyItemMetaCustomizations(headMeta, "gui.mail-view.items.sender-head", false);
             head.setItemMeta(headMeta);
             inv.setItem(config().getInt("gui.mail-view.items.sender-head.slot"), head);
         }
@@ -560,6 +612,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                     .map(line -> plugin.colorize("&f" + line))
                     .collect(Collectors.toList());
             messageMeta.setLore(messageLore);
+            applyItemMetaCustomizations(messageMeta, "gui.mail-view.items.message", false);
             messageItem.setItemMeta(messageMeta);
             inv.setItem(config().getInt("gui.mail-view.items.message.slot"), messageItem);
         }
@@ -606,6 +659,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                     .collect(Collectors.toList()));
             claimMeta.getPersistentDataContainer().set(mailIdKey,
                     PersistentDataType.STRING, mailId);
+            applyItemMetaCustomizations(claimMeta, "gui.mail-view.items.claim-button");
             claimButton.setItemMeta(claimMeta);
             inv.setItem(claimSlot, claimButton);
         }
@@ -619,9 +673,12 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                     .collect(Collectors.toList()));
             dismissMeta.getPersistentDataContainer().set(mailIdKey,
                     PersistentDataType.STRING, mailId);
+            applyItemMetaCustomizations(dismissMeta, "gui.mail-view.items.dismiss-button");
             dismissButton.setItemMeta(dismissMeta);
             inv.setItem(dismissSlot, dismissButton);
         }
+
+        placeBackButton(inv, "gui.mail-view.items.back-button", "mail-view-back");
 
         return inv;
     }
@@ -650,6 +707,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                         .replace("%receiver%", session.getReceiver())));
             }
             headMeta.setLore(lore);
+            applyItemMetaCustomizations(headMeta, "gui.create-mail.items.receiver-head", false);
             head.setItemMeta(headMeta);
             inv.setItem(config().getInt("gui.create-mail.items.receiver-head.slot"), head);
         }
@@ -667,6 +725,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                         .collect(Collectors.toList()));
             }
             paperMeta.setLore(paperLore);
+            applyItemMetaCustomizations(paperMeta, "gui.create-mail.items.message-paper");
             paper.setItemMeta(paperMeta);
             inv.setItem(config().getInt("gui.create-mail.items.message-paper.slot"), paper);
         }
@@ -680,6 +739,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                 chestMeta.setLore(config().getStringList("gui.create-mail.items.items-chest.lore").stream()
                         .map(plugin::colorize)
                         .collect(Collectors.toList()));
+                applyItemMetaCustomizations(chestMeta, "gui.create-mail.items.items-chest");
                 chest.setItemMeta(chestMeta);
                 inv.setItem(chestSlot, chest);
             } else {
@@ -694,6 +754,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             sendMeta.setLore(config().getStringList("gui.create-mail.items.send-button.lore").stream()
                     .map(plugin::colorize)
                     .collect(Collectors.toList()));
+            applyItemMetaCustomizations(sendMeta, "gui.create-mail.items.send-button");
             sendButton.setItemMeta(sendMeta);
             inv.setItem(config().getInt("gui.create-mail.items.send-button.slot"), sendButton);
         }
@@ -725,6 +786,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                         .map(line -> line.replace("%schedule_time%", scheduleTime).replace("%expire_time%", expireTime))
                         .map(plugin::colorize)
                         .collect(Collectors.toList()));
+                applyItemMetaCustomizations(clockMeta, "gui.create-mail.items.schedule-clock");
                 clock.setItemMeta(clockMeta);
                 inv.setItem(clockSlot, clock);
             }
@@ -736,6 +798,8 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                 inv.setItem(clockSlot, createDisabledFiller());
             }
         }
+
+        placeBackButton(inv, "gui.create-mail.items.back-button", "create-back");
 
         return inv;
     }
@@ -757,9 +821,12 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             saveMeta.setLore(config().getStringList("gui.items.items.save-button.lore").stream()
                     .map(plugin::colorize)
                     .collect(Collectors.toList()));
+            applyItemMetaCustomizations(saveMeta, "gui.items.items.save-button");
             saveButton.setItemMeta(saveMeta);
             inv.setItem(config().getInt("gui.items.items.save-button.slot"), saveButton);
         }
+
+        placeBackButton(inv, "gui.items.items.back-button", "items-back");
         return inv;
     }
 
@@ -814,11 +881,15 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         placeholders.put("%name%", draft.displayName());
         placeholders.put("%lore_count%", String.valueOf(draft.lore().size()));
         placeholders.put("%command_count%", String.valueOf(draft.commands().size()));
+        placeholders.put("%custom_model_data%", draft.customModelData() != null
+                ? String.valueOf(draft.customModelData())
+                : "None");
 
         placeCreatorButton(inv, base + ".items.material-selector", "material", placeholders, draft);
         placeCreatorButton(inv, base + ".items.name-editor", "name", placeholders, draft);
         placeCreatorButton(inv, base + ".items.lore-editor", "lore", placeholders, draft);
         placeCreatorButton(inv, base + ".items.commands-editor", "command", placeholders, draft);
+        placeCreatorButton(inv, base + ".items.custom-model-editor", "custom-model", placeholders, draft);
 
         // Preview item
         int previewSlot = config().getInt(base + ".items.preview.slot", size / 2);
@@ -829,6 +900,8 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             ItemStack save = buildEditorStaticButton(base + ".items.save-button", "save");
             inv.setItem(config().getInt(base + ".items.save-button.slot", size - 6), save);
         }
+
+        placeBackButton(inv, base + ".items.back-button", "command-creator-back");
 
         return inv;
     }
@@ -857,6 +930,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
 
         bookMeta.setLore(bookLore.stream().map(plugin::colorize).collect(Collectors.toList()));
+        applyItemMetaCustomizations(bookMeta, "gui.main.items.create-mail");
         createBook.setItemMeta(bookMeta);
         inv.setItem(config().getInt("gui.main.items.create-mail.slot"), createBook);
     }
@@ -871,6 +945,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         sentMailMeta.setLore(config().getStringList("gui.main.items.sent-mail.lore").stream()
                 .map(plugin::colorize)
                 .collect(Collectors.toList()));
+        applyItemMetaCustomizations(sentMailMeta, "gui.main.items.sent-mail");
         sentMailButton.setItemMeta(sentMailMeta);
         inv.setItem(config().getInt("gui.main.items.sent-mail.slot"), sentMailButton);
     }
@@ -885,6 +960,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         backMeta.setLore(config().getStringList("gui.sent-mail.items.back-button.lore").stream()
                 .map(plugin::colorize)
                 .collect(Collectors.toList()));
+        applyItemMetaCustomizations(backMeta, "gui.sent-mail.items.back-button");
         backButton.setItemMeta(backMeta);
         inv.setItem(config().getInt("gui.sent-mail.items.back-button.slot"), backButton);
     }
@@ -1051,6 +1127,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
 
         meta.setLore(lore);
+        applyItemMetaCustomizations(meta, itemPath, false);
         meta.getPersistentDataContainer().set(mailIdKey, PersistentDataType.STRING, record.id());
         mailItem.setItemMeta(meta);
         return mailItem;
@@ -1081,6 +1158,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                         .replace("%expire%", formatDate(expireAt))))
                 .collect(Collectors.toList());
         meta.setLore(lore);
+        applyItemMetaCustomizations(meta, "gui.sent-mail.items.sent-mail-display", false);
         meta.getPersistentDataContainer().set(mailIdKey, PersistentDataType.STRING, record.id());
         item.setItemMeta(meta);
         return item;
@@ -1143,6 +1221,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                 meta.getPersistentDataContainer().set(new NamespacedKey(plugin, "decorationPath"),
                         PersistentDataType.STRING, path);
             }
+            applyItemMetaCustomizations(meta, path);
             decorItem.setItemMeta(meta);
             for (int slot : slots) {
                 inv.setItem(slot, decorItem.clone());
@@ -1241,6 +1320,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             }
 
             meta.setLore(lore);
+            applyItemMetaCustomizations(meta, basePath, false);
             item.setItemMeta(meta);
         }
         return item;
@@ -1273,8 +1353,10 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                         .map(plugin::colorize)
                         .collect(Collectors.toList()));
             }
-
             meta.setLore(lore);
+            if (!meta.hasCustomModelData()) {
+                applyItemMetaCustomizations(meta, base, false);
+            }
             meta.getPersistentDataContainer().set(commandItemIndexKey, PersistentDataType.INTEGER, index);
             stack.setItemMeta(meta);
         }
@@ -1295,6 +1377,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                     .map(plugin::colorize)
                     .collect(Collectors.toList());
             meta.setLore(lore);
+            applyItemMetaCustomizations(meta, path);
             meta.getPersistentDataContainer().set(commandItemActionKey, PersistentDataType.STRING, action);
             item.setItemMeta(meta);
         }
@@ -1331,6 +1414,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                 appendDetailLines(lore, "&7Lore:", draft.lore(), 10, false);
             } else if ("command".equals(action) && !draft.commands().isEmpty()) {
                 appendDetailLines(lore, "&7Commands:", draft.commands(), 10, true);
+            } else if ("custom-model".equals(action)) {
+                String value = draft.customModelData() != null ? String.valueOf(draft.customModelData()) : "None";
+                lore.add(plugin.colorize("&7Current: &f" + value));
             }
 
             if (!lore.isEmpty()) {
@@ -1338,6 +1424,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             }
 
             meta.getPersistentDataContainer().set(commandItemActionKey, PersistentDataType.STRING, action);
+            applyItemMetaCustomizations(meta, path);
             item.setItemMeta(meta);
         }
         inv.setItem(slot, item);
@@ -1351,6 +1438,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         result = result.replace("%name%", draft.displayName());
         result = result.replace("%lore_count%", String.valueOf(draft.lore().size()));
         result = result.replace("%command_count%", String.valueOf(draft.commands().size()));
+        result = result.replace("%custom_model_data%", draft.customModelData() != null
+                ? String.valueOf(draft.customModelData())
+                : "None");
         if (!draft.commands().isEmpty()) {
             result = result.replace("%first_command%", draft.commands().get(0));
             result = result.replace("%summary%", summarizeCommand(draft.commands().get(0)));
@@ -1388,6 +1478,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         placeholders.put("%lore_count%", String.valueOf(loreCount));
         placeholders.put("%lore_values%", formatList(commandItem.lore(), 3, false));
         placeholders.put("%first_lore%", loreCount > 0 ? commandItem.lore().get(0) : "");
+        placeholders.put("%custom_model_data%", commandItem.customModelData() != null
+                ? String.valueOf(commandItem.customModelData())
+                : "None");
         return placeholders;
     }
 

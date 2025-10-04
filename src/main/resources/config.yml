@@ -1,4 +1,4 @@
-version: 1.5
+version: 1.6
 
 settings:
   max-mails-per-player: 54
@@ -196,6 +196,14 @@ gui:
         lore:
           - '&7Runs a server command when claimed.'
 
+      back-button:
+        enabled: true
+        material: ARROW
+        name: '&cʙᴀᴄᴋ'
+        lore:
+          - '&7Return to sent list'
+        slot: 36
+
       delete-button:
         enabled: true
         material: RED_TERRACOTTA
@@ -275,6 +283,14 @@ gui:
           - "&cᴇxᴘɪʀʏ ᴛɪᴍᴇ: &f%expire_time%"
         slot: 16
 
+      back-button:
+        enabled: true
+        material: ARROW
+        name: '&cʙᴀᴄᴋ'
+        lore:
+          - '&7Return to your mailbox'
+        slot: 18
+
       send-button:
         enabled: true
         material: GREEN_TERRACOTTA
@@ -286,6 +302,13 @@ gui:
     title: '&8ᴀᴅᴅ ɪᴛᴇᴍs'
     size: 27
     items:
+      back-button:
+        enabled: true
+        material: ARROW
+        name: '&cʙᴀᴄᴋ'
+        lore:
+          - '&7Return to compose menu'
+        slot: 18
       save-button:
         enabled: true
         material: GREEN_TERRACOTTA
@@ -302,7 +325,7 @@ gui:
         enabled: true
         material: BLACK_STAINED_GLASS_PANE
         name: ' '
-        slots: [0,1,2,3,4,5,6,7,8,9,17,18,19,20,21,22,23,26]
+        slots: [0,1,2,3,4,5,6,7,8,9,17,19,20,21,22,23,24,25,26]
     items:
       command-item:
         enabled: true
@@ -317,14 +340,14 @@ gui:
         name: '&a+ Add Command Item'
         lore:
           - '&7Create a new command action'
-        slot: 24
+        slot: 26
       back-button:
         enabled: true
         material: ARROW
         name: '&cBack to Mail Creation'
         lore:
           - '&7Return to compose menu'
-        slot: 25
+        slot: 18
 
   command-item-creator:
     title: '&8ᴄᴏᴍᴍᴀɴᴅ ɪᴛᴇᴍ ᴇᴅɪᴛᴏʀ'
@@ -334,7 +357,7 @@ gui:
         enabled: true
         material: BLACK_STAINED_GLASS_PANE
         name: ' '
-        slots: [0,1,2,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,25]
+        slots: [0,1,2,3,4,5,6,7,8,9,15,17,18,19,20,21,22,23,24,25]
     items:
       material-selector:
         enabled: true
@@ -350,7 +373,7 @@ gui:
         lore:
           - '&7Current: &f%name%'
           - '&7Click to edit via chat'
-        slot: 12
+        slot: 11
       lore-editor:
         enabled: true
         material: WRITABLE_BOOK
@@ -358,7 +381,7 @@ gui:
         lore:
           - '&7Left-click to add line'
           - '&7Right-click to remove last'
-        slot: 13
+        slot: 12
       commands-editor:
         enabled: true
         material: COMMAND_BLOCK
@@ -366,9 +389,24 @@ gui:
         lore:
           - '&7Left-click to add command'
           - '&7Right-click to remove last'
+        slot: 13
+      custom-model-editor:
+        enabled: true
+        material: GOLD_NUGGET
+        name: '&6Custom Model (&f%custom_model_data%&6)'
+        lore:
+          - '&7Left-click to set custom model data'
+          - '&7Right-click to clear'
         slot: 14
       preview:
         slot: 16
+      back-button:
+        enabled: true
+        material: ARROW
+        name: '&cʙᴀᴄᴋ'
+        lore:
+          - '&7Return to actions list'
+        slot: 18
       save-button:
         enabled: true
         material: LIME_CONCRETE
@@ -414,6 +452,14 @@ gui:
         name: '&6Console Action'
         lore:
           - '&7Executes when claimed'
+
+      back-button:
+        enabled: true
+        material: ARROW
+        name: '&cʙᴀᴄᴋ'
+        lore:
+          - '&7Return to mailbox'
+        slot: 36
 
       pagination:
         previous-button:
@@ -478,6 +524,7 @@ messages:
   enter-command-item-name: '&eEnter item display name (color codes supported):'
   enter-command-item-lore: '&eEnter lore line. Right-click the lore button to remove the last entry.'
   enter-command-item-command: '&eEnter command (without /). Right-click the command button to remove the last entry.'
+  enter-command-item-custom-model: '&eEnter custom model data (number) or type CLEAR.'
   incomplete-mail: '&c⚠ Cannot send mail - some details are missing!'
   current-receiver: '&a✉ Sending to: &f%receiver%'
   current-message: '&a✎ Your message:'
@@ -510,6 +557,9 @@ messages:
   command-item-command-empty: '&c✖ No commands to remove.'
   command-item-command-added: '&a✔ Added command.'
   command-item-command-failed: '&c✖ Could not update commands.'
+  command-item-model-set: '&a✔ Custom model data set to &f%value%&a.'
+  command-item-model-cleared: '&a✔ Custom model data cleared.'
+  command-item-model-invalid: '&c✖ Invalid custom model data. Use a non-negative number or CLEAR.'
   command-item-no-draft: '&c✖ Nothing to save.'
   command-item-requires-command: '&c✖ Add at least one command before saving.'
   command-item-saved: '&a✔ Command item saved!'
@@ -568,6 +618,9 @@ titles:
     command-item-command:
       title: "&6⌘ Command Item Action"
       subtitle: "&eEnter console command (no /)"
+    command-item-custom-model:
+      title: "&6⌘ Custom Model Data"
+      subtitle: "&eEnter a non-negative integer or CLEAR"
     schedule:
       title: "&6⏰ Schedule Delivery"
       subtitle: "&eFormat: YYYY:MM:DD:HH:mm"

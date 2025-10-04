@@ -142,6 +142,35 @@ public class MailCreationController {
         return true;
     }
 
+    public boolean handleCommandItemCustomModelInput(Player player, String input, MailCreationSession session) {
+        CommandItem.Builder draft = ensureCommandItemDraft(session);
+        if (input == null) {
+            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-model-invalid", "&c✖ Invalid custom model data.")));
+            return false;
+        }
+
+        String trimmed = input.trim();
+        if (trimmed.isEmpty() || trimmed.equalsIgnoreCase("clear") || trimmed.equalsIgnoreCase("none") || trimmed.equalsIgnoreCase("reset")) {
+            draft.customModelData(null);
+            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-model-cleared", "&a✔ Custom model data cleared.")));
+            return true;
+        }
+
+        try {
+            int value = Integer.parseInt(trimmed);
+            if (value < 0) {
+                throw new NumberFormatException("negative");
+            }
+            draft.customModelData(value);
+            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-model-set", "&a✔ Custom model data updated."))
+                    .replace("%value%", String.valueOf(value)));
+            return true;
+        } catch (NumberFormatException ex) {
+            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-model-invalid", "&c✖ Invalid custom model data.")));
+            return false;
+        }
+    }
+
     public boolean finalizeCommandItem(Player player, MailCreationSession session) {
         CommandItem.Builder draft = session.getCommandItemDraft();
         if (draft == null) {
