@@ -353,25 +353,39 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
 
     private List<String> collectLoreLines(String basePath) {
         Object loreValue = config().get(basePath + ".lore");
-        List<String> lines = new ArrayList<>();
         if (loreValue instanceof String singleLine) {
-            if (!singleLine.isBlank()) {
-                lines.add(singleLine);
-            }
-            return lines;
+            return collectSingleLoreLine(singleLine);
         }
         if (loreValue instanceof Collection<?> collection) {
-            for (Object entry : collection) {
-                if (entry == null) {
-                    continue;
-                }
-                String line = entry.toString();
-                if (!line.isBlank()) {
-                    lines.add(line);
-                }
+            return collectLoreFromCollection(collection);
+        }
+        return Collections.emptyList();
+    }
+
+    private List<String> collectSingleLoreLine(String line) {
+        if (line == null || line.isBlank()) {
+            return Collections.emptyList();
+        }
+        return Collections.singletonList(line);
+    }
+
+    private List<String> collectLoreFromCollection(Collection<?> collection) {
+        List<String> lines = new ArrayList<>();
+        for (Object entry : collection) {
+            String line = normalizeLoreEntry(entry);
+            if (line != null) {
+                lines.add(line);
             }
         }
         return lines;
+    }
+
+    private String normalizeLoreEntry(Object entry) {
+        if (entry == null) {
+            return null;
+        }
+        String line = entry.toString();
+        return line.isBlank() ? null : line;
     }
 
     private void applyCustomModelData(ItemMeta meta, String basePath) {
