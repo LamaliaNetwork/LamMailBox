@@ -105,7 +105,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
         // Initialize YskLib MessageManager
         yskLib = (YskLib) getServer().getPluginManager().getPlugin("YskLib");
         if (yskLib == null) {
-            getLogger().severe("YskLib not found! Please install YskLib 1.6.5 or above.");
+            getLogger().severe("YskLib not found! Please install YskLib 1.6.7 or above.");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
