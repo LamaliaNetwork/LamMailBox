@@ -2,21 +2,30 @@ package com.yusaki.lammailbox.config;
 
 import com.yusaki.lammailbox.LamMailBox;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.yusaki.lib.config.ConfigMigration;
 import org.yusaki.lib.config.ConfigUpdateOptions;
 import org.yusaki.lib.config.ConfigUpdateService;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Objects;
 /**
  * Handles configuration updates for LamMailBox using YskLib's ConfigUpdateService.
  */
 public class MailBoxConfigUpdater {
     private final LamMailBox plugin;
+    private final YamlConfiguration bundledDefaults;
 
     public MailBoxConfigUpdater(LamMailBox plugin) {
         this.plugin = plugin;
+        this.bundledDefaults = loadBundledDefaults();
     }
 
     /**
@@ -63,17 +72,22 @@ public class MailBoxConfigUpdater {
     }
 
     // Config version - tracks configuration schema changes
-    private static final double CURRENT_CONFIG_VERSION = 1.5;
+    private static final double CURRENT_CONFIG_VERSION = 1.7;
 
     /**
      * Creates migrations for different config versions.
      */
     private ConfigMigration createVersionMigration() {
         return ConfigMigration.guarded(
-            CURRENT_CONFIG_VERSION,
-            config -> !config.contains("version") || config.getDouble("version", 0.0) < CURRENT_CONFIG_VERSION,
-            this::migrateToCurrentConfigVersion,
-            "Update config schema to version " + CURRENT_CONFIG_VERSION
+                CURRENT_CONFIG_VERSION,
+                config -> {
+                    double existingVersion = config.getDouble("version", 0.0);
+                    return !config.contains("version")
+                            || existingVersion < CURRENT_CONFIG_VERSION
+                            || hasMissingMessages(config);
+                },
+                this::migrateToCurrentConfigVersion,
+                "Update config schema to version " + CURRENT_CONFIG_VERSION
         );
     }
 
@@ -106,8 +120,7 @@ public class MailBoxConfigUpdater {
             aliasSection.set("lmb", aliases);
         }
 
-        // Add any config-specific migrations here
-        // Example: if (config.getDouble("version", 0.0) < 1.1) { ... }
+        mergeMessages(config);
 
         plugin.getLogger().info("Config schema migration to version " + CURRENT_CONFIG_VERSION + " completed.");
     }
@@ -118,5 +131,80 @@ public class MailBoxConfigUpdater {
     private void reloadMainConfig(File configFile) {
         plugin.reloadConfig();
         plugin.getLogger().info("Main configuration reloaded after update.");
+    }
+
+    private YamlConfiguration loadBundledDefaults() {
+        try (InputStream stream = plugin.getResource("config.yml")) {
+            if (stream == null) {
+                plugin.getLogger().warning("Bundled config.yml resource not found; message merge skipped.");
+                return null;
+            }
+            YamlConfiguration yaml = new YamlConfiguration();
+            yaml.load(new InputStreamReader(stream, StandardCharsets.UTF_8));
+            return yaml;
+        } catch (IOException | InvalidConfigurationException ex) {
+            plugin.getLogger().warning("Failed to load default config.yml: " + ex.getMessage());
+            return null;
+        }
+    }
+
+    private boolean hasMissingMessages(FileConfiguration config) {
+        if (bundledDefaults == null) {
+            return false;
+        }
+        ConfigurationSection defaults = bundledDefaults.getConfigurationSection("messages");
+        if (defaults == null) {
+            return false;
+        }
+        ConfigurationSection current = config.getConfigurationSection("messages");
+        if (current == null) {
+            return true;
+        }
+        return hasMissingMessages(current, defaults);
+    }
+
+    private boolean hasMissingMessages(ConfigurationSection target, ConfigurationSection defaults) {
+        for (String key : defaults.getKeys(false)) {
+            if (defaults.isConfigurationSection(key)) {
+                ConfigurationSection childDefaults = Objects.requireNonNull(defaults.getConfigurationSection(key));
+                ConfigurationSection childTarget = target.getConfigurationSection(key);
+                if (childTarget == null || hasMissingMessages(childTarget, childDefaults)) {
+                    return true;
+                }
+            } else if (!target.isSet(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void mergeMessages(FileConfiguration config) {
+        if (bundledDefaults == null) {
+            return;
+        }
+        ConfigurationSection defaults = bundledDefaults.getConfigurationSection("messages");
+        if (defaults == null) {
+            return;
+        }
+        ConfigurationSection messages = config.getConfigurationSection("messages");
+        if (messages == null) {
+            messages = config.createSection("messages");
+        }
+        mergeSections(messages, defaults);
+    }
+
+    private void mergeSections(ConfigurationSection target, ConfigurationSection defaults) {
+        for (String key : defaults.getKeys(false)) {
+            if (defaults.isConfigurationSection(key)) {
+                ConfigurationSection defaultChild = Objects.requireNonNull(defaults.getConfigurationSection(key));
+                ConfigurationSection targetChild = target.getConfigurationSection(key);
+                if (targetChild == null) {
+                    targetChild = target.createSection(key);
+                }
+                mergeSections(targetChild, defaultChild);
+            } else if (!target.isSet(key)) {
+                target.set(key, defaults.get(key));
+            }
+        }
     }
 }
