@@ -24,7 +24,7 @@ public class MailCreationController {
         String titleKey = config().contains(path + ".title") ? path + ".title" : "titles.input.command.title";
         String subtitleKey = config().contains(path + ".subtitle") ? path + ".subtitle" : "titles.input.command.subtitle";
 
-        plugin.getYskLib().messageManager.sendTitle(
+        plugin.getMessageManager().sendTitle(
                 plugin,
                 player,
                 titleKey,
@@ -41,14 +41,14 @@ public class MailCreationController {
         String titlePath = "titles.response." + type;
 
         if (customSubtitle != null) {
-            String title = plugin.getYskLib().messageManager.getMessage(plugin, titlePath + ".title", Collections.emptyMap());
+            String title = plugin.getMessageManager().getMessage(plugin, titlePath + ".title", Collections.emptyMap());
             String subtitle = plugin.legacy(customSubtitle);
             player.sendTitle(title, subtitle,
                     config().getInt("titles.response.fadein"),
                     config().getInt("titles.response.stay"),
                     config().getInt("titles.response.fadeout"));
         } else {
-            plugin.getYskLib().messageManager.sendTitle(
+            plugin.getMessageManager().sendTitle(
                     plugin,
                     player,
                     titlePath + ".title",
