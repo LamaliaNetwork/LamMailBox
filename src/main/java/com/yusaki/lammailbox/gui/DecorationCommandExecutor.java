@@ -51,7 +51,10 @@ final class DecorationCommandExecutor {
                 if (template == null || template.trim().isEmpty()) {
                     continue;
                 }
+                // YskLib MessageManager now supports both {placeholder} and %placeholder% formats
                 String command = template
+                        .replace("{player}", playerName)
+                        .replace("{uuid}", uuid)
                         .replace("%player%", playerName)
                         .replace("%uuid%", uuid);
                 Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);

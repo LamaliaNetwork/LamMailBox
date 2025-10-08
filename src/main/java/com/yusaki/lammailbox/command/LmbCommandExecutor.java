@@ -239,7 +239,7 @@ public class LmbCommandExecutor implements CommandExecutor {
             plugin.openMailboxAsPlayer(admin, targetPlayer);
             String message = config.getString("messages.mailbox-opened-as", "&aOpened mailbox as %player%");
             admin.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                    message.replace("%player%", targetPlayer.getName())));
+                    plugin.applyPlaceholderVariants(message, "player", targetPlayer.getName())));
         } else {
             String warning = config.getString("messages.console-gui-warning",
                     "&cConsole cannot open GUI. Use /lmb <player> instead.");
@@ -270,7 +270,7 @@ public class LmbCommandExecutor implements CommandExecutor {
         plugin.openMainGUI(target);
         String message = config.getString("messages.mailbox-opened-for", "&aOpened mailbox for %player%");
         sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                message.replace("%player%", target.getName())));
+                plugin.applyPlaceholderVariants(message, "player", target.getName())));
         return true;
     }
 
@@ -344,9 +344,9 @@ public class LmbCommandExecutor implements CommandExecutor {
 
                 if (definition.maxRuns() != null) {
                     int runCount = statusRepository != null ? statusRepository.getRunCount(definition.id()) : 0;
-                    runsSegment = runsTemplate
-                            .replace("%current%", String.valueOf(runCount))
-                            .replace("%max%", String.valueOf(definition.maxRuns()));
+                    runsSegment = plugin.applyPlaceholderVariants(runsTemplate, Map.of(
+                            "current", String.valueOf(runCount),
+                            "max", String.valueOf(definition.maxRuns())));
                     if (runCount >= definition.maxRuns()) {
                         completedSegment = completedTemplate;
                     }
@@ -354,14 +354,14 @@ public class LmbCommandExecutor implements CommandExecutor {
             }
 
             String template = definition.type() == MailingType.FIRST_JOIN ? firstJoinTemplate : repeatingTemplate;
-            String line = template
-                    .replace("%id%", definition.id())
-                    .replace("%status%", statusText)
-                    .replace("%schedule%", scheduleText)
-                    .replace("%next%", nextText)
-                    .replace("%last%", lastText)
-                    .replace("%runs%", runsSegment)
-                    .replace("%completed%", completedSegment);
+            String line = plugin.applyPlaceholderVariants(template, Map.of(
+                    "id", definition.id(),
+                    "status", statusText,
+                    "schedule", scheduleText,
+                    "next", nextText,
+                    "last", lastText,
+                    "runs", runsSegment,
+                    "completed", completedSegment));
 
             sender.sendMessage(plugin.colorize(prefix + line));
         }

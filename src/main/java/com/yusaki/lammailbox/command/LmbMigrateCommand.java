@@ -41,11 +41,17 @@ public class LmbMigrateCommand implements CommandExecutor {
         StorageSettings.BackendType targetType = parseBackend(args[1]);
 
         if (sourceType == null) {
-            sender.sendMessage(plugin.colorize(prefix + config.getString("messages.migrate-invalid", "&c✖ Unknown storage type: %type%").replace("%type%", args[0].toLowerCase(Locale.ROOT))));
+            sender.sendMessage(plugin.colorize(prefix + plugin.applyPlaceholderVariants(
+                    config.getString("messages.migrate-invalid", "&c✖ Unknown storage type: %type%"),
+                    "type",
+                    args[0].toLowerCase(Locale.ROOT))));
             return true;
         }
         if (targetType == null) {
-            sender.sendMessage(plugin.colorize(prefix + config.getString("messages.migrate-invalid", "&c✖ Unknown storage type: %type%").replace("%type%", args[1].toLowerCase(Locale.ROOT))));
+            sender.sendMessage(plugin.colorize(prefix + plugin.applyPlaceholderVariants(
+                    config.getString("messages.migrate-invalid", "&c✖ Unknown storage type: %type%"),
+                    "type",
+                    args[1].toLowerCase(Locale.ROOT))));
             return true;
         }
         if (sourceType == targetType) {
@@ -66,23 +72,29 @@ public class LmbMigrateCommand implements CommandExecutor {
 
             List<String> sourceIds = sourceRepo.listMailIds();
             if (sourceIds.isEmpty()) {
-                sender.sendMessage(plugin.colorize(prefix + config.getString("messages.migrate-empty", "&eNo mail entries found in %source% storage.").replace("%source%", args[0].toLowerCase(Locale.ROOT))));
+                sender.sendMessage(plugin.colorize(prefix + plugin.applyPlaceholderVariants(
+                        config.getString("messages.migrate-empty", "&eNo mail entries found in %source% storage."),
+                        "source",
+                        args[0].toLowerCase(Locale.ROOT))));
                 return true;
             }
 
             // Check if target database is empty before proceeding
             List<String> targetIds = targetRepo.listMailIds();
             if (!targetIds.isEmpty()) {
-                sender.sendMessage(plugin.colorize(prefix + config.getString("messages.migrate-target-not-empty", 
-                    "&c✖ Target storage contains %count% mail entries. Please clear the target storage first or choose an empty target.")
-                    .replace("%count%", String.valueOf(targetIds.size()))
-                    .replace("%target%", args[1].toLowerCase(Locale.ROOT))));
+                String template = config.getString("messages.migrate-target-not-empty",
+                        "&c✖ Target storage contains %count% mail entries. Please clear the target storage first or choose an empty target.");
+                sender.sendMessage(plugin.colorize(prefix + plugin.applyPlaceholderVariants(template, Map.of(
+                        "count", String.valueOf(targetIds.size()),
+                        "target", args[1].toLowerCase(Locale.ROOT)))));
                 return true;
             }
 
-            sender.sendMessage(plugin.colorize(prefix + config.getString("messages.migrate-start", "&eMigrating mail from %source% to %target%...")
-                    .replace("%source%", args[0].toLowerCase(Locale.ROOT))
-                    .replace("%target%", args[1].toLowerCase(Locale.ROOT))));
+            String startTemplate = config.getString("messages.migrate-start",
+                    "&eMigrating mail from &f%source% &eto &f%target%&e...");
+            sender.sendMessage(plugin.colorize(prefix + plugin.applyPlaceholderVariants(startTemplate, Map.of(
+                    "source", args[0].toLowerCase(Locale.ROOT),
+                    "target", args[1].toLowerCase(Locale.ROOT)))));
 
             int migrated = 0;
             for (String mailId : sourceIds) {
@@ -94,13 +106,19 @@ public class LmbMigrateCommand implements CommandExecutor {
             }
             targetRepo.save();
 
-            sender.sendMessage(plugin.colorize(prefix + config.getString("messages.migrate-success", "&a✔ Migration complete: %count% mails moved to %target%.")
-                    .replace("%count%", String.valueOf(migrated))
-                    .replace("%target%", args[1].toLowerCase(Locale.ROOT))));
+            String successTemplate = config.getString("messages.migrate-success",
+                    "&a✔ Migration complete: %count% mails moved to %target%.");
+            String successMessage = plugin.applyPlaceholderVariants(successTemplate, Map.of(
+                    "count", String.valueOf(migrated),
+                    "target", args[1].toLowerCase(Locale.ROOT)));
+            sender.sendMessage(plugin.colorize(prefix + successMessage));
         } catch (Exception ex) {
             plugin.getLogger().severe("Migration failed: " + ex.getMessage());
-            sender.sendMessage(plugin.colorize(prefix + config.getString("messages.migrate-error", "&c✖ Migration failed: %error%")
-                    .replace("%error%", Optional.ofNullable(ex.getMessage()).orElse("unknown"))));
+            String errorTemplate = config.getString("messages.migrate-error", "&c✖ Migration failed: %error%");
+            String errorMessage = plugin.applyPlaceholderVariants(errorTemplate,
+                    "error",
+                    Optional.ofNullable(ex.getMessage()).orElse("unknown"));
+            sender.sendMessage(plugin.colorize(prefix + errorMessage));
         } finally {
             if (!reuseSource && sourceRepo != null) {
                 sourceRepo.shutdown();

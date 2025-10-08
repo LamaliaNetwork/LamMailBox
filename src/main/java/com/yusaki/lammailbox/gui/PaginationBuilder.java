@@ -132,10 +132,14 @@ final class PaginationBuilder {
         String name = config.getString(path + ".name", defaultName);
         if (name != null) {
             if (type == PaginationButtonType.INDICATOR) {
-                name = name.replace("%current%", String.valueOf(currentPage))
-                        .replace("%total%", String.valueOf(totalPages));
+                name = plugin.getMessage(path + ".name", plugin.placeholders(
+                        "current", String.valueOf(currentPage),
+                        "total", String.valueOf(totalPages)
+                ));
+            } else {
+                name = plugin.colorize(name);
             }
-            meta.setDisplayName(plugin.colorize(name));
+            meta.setDisplayName(name);
         }
 
         if (type != PaginationButtonType.INDICATOR && action != null) {

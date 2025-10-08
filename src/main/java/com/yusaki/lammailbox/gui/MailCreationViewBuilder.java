@@ -176,8 +176,8 @@ final class MailCreationViewBuilder {
                 config().getStringList(path + ".lore");
         List<String> lore = headLore.stream().map(plugin::colorize).collect(Collectors.toList());
         if (session.getReceiver() != null) {
-            lore.add(plugin.colorize(config().getString(path + ".current-receiver-format")
-                    .replace("%receiver%", session.getReceiver())));
+            lore.add(plugin.getMessage(path + ".current-receiver-format",
+                    plugin.placeholders("receiver", session.getReceiver())));
         }
         headMeta.setLore(lore);
         itemStyler.apply(headMeta, path, false);
@@ -298,7 +298,9 @@ final class MailCreationViewBuilder {
                 : "Not set";
 
         List<String> lore = config().getStringList(basePath + ".lore").stream()
-                .map(line -> line.replace("%schedule_time%", scheduleTime).replace("%expire_time%", expireTime))
+                .map(line -> plugin.applyPlaceholderVariants(line, Map.of(
+                        "schedule_time", scheduleTime,
+                        "expire_time", expireTime)))
                 .map(plugin::colorize)
                 .collect(Collectors.toList());
         clockMeta.setLore(lore);

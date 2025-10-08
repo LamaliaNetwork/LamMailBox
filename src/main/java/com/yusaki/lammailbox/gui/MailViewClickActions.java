@@ -134,9 +134,9 @@ final class MailViewClickActions {
                     .filter(item -> item == null || item.getType() == Material.AIR)
                     .count();
             if (emptySlots < items.size()) {
-                player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
-                        config().getString("messages.inventory-space-needed")
-                                .replace("%amount%", String.valueOf(items.size()))));
+                plugin.sendMessage(player, "messages.prefix");
+                plugin.sendMessage(player, "messages.inventory-space-needed",
+                        plugin.placeholders("amount", String.valueOf(items.size())));
                 return;
             }
 
@@ -146,7 +146,10 @@ final class MailViewClickActions {
         if (!commandItems.isEmpty()) {
             plugin.getFoliaLib().getScheduler().runNextTick(task -> commandItems.forEach(commandItem ->
                     commandItem.commands().forEach(command -> {
-                        String processed = command.replace("%player%", player.getName());
+                        // YskLib MessageManager now supports both {placeholder} and %placeholder% formats
+                        String processed = command
+                                .replace("{player}", player.getName())
+                                .replace("%player%", player.getName());
                         Bukkit.dispatchCommand(Bukkit.getConsoleSender(), processed);
                     })));
         }

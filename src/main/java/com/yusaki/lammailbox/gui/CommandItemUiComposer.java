@@ -66,12 +66,14 @@ final class CommandItemUiComposer {
             return item;
         }
 
-        String name = config().getString(basePath + ".name", "&6Command Items");
-        meta.setDisplayName(plugin.colorize(name
-                .replace("%count%", String.valueOf(session.getCommandItems().size()))));
+        String name = plugin.getMessage(basePath + ".name",
+                plugin.placeholders("count", String.valueOf(session.getCommandItems().size())));
+        meta.setDisplayName(name);
 
         List<String> lore = config().getStringList(basePath + ".lore").stream()
-                .map(line -> line.replace("%count%", String.valueOf(session.getCommandItems().size())))
+                .map(line -> plugin.applyPlaceholderVariants(line,
+                        "count",
+                        String.valueOf(session.getCommandItems().size())))
                 .map(plugin::colorize)
                 .collect(Collectors.toList());
 
@@ -195,11 +197,10 @@ final class CommandItemUiComposer {
         if (input == null) {
             return "";
         }
-        String result = input;
-        for (Map.Entry<String, String> entry : placeholders.entrySet()) {
-            result = result.replace(entry.getKey(), entry.getValue());
+        if (placeholders == null || placeholders.isEmpty()) {
+            return input;
         }
-        return result;
+        return plugin.applyPlaceholderVariants(input, placeholders);
     }
 
     Map<String, String> createCommandItemPlaceholders(CommandItem commandItem) {
@@ -210,15 +211,15 @@ final class CommandItemUiComposer {
         String firstCommand = commandCount > 0 ? commandItem.commands().get(0) : "";
         String summary = firstCommand.isEmpty() ? "" : Optional.ofNullable(summarizeCommand(firstCommand)).orElse(firstCommand);
 
-        placeholders.put("%commands%", formatList(commandItem.commands(), 3, true));
-        placeholders.put("%command_count%", String.valueOf(commandCount));
-        placeholders.put("%total%", String.valueOf(commandCount));
-        placeholders.put("%first_command%", firstCommand);
-        placeholders.put("%summary%", summary);
-        placeholders.put("%lore_count%", String.valueOf(loreCount));
-        placeholders.put("%lore_values%", formatList(commandItem.lore(), 3, false));
-        placeholders.put("%first_lore%", loreCount > 0 ? commandItem.lore().get(0) : "");
-        placeholders.put("%custom_model_data%", commandItem.customModelData() != null
+        placeholders.put("{commands}", formatList(commandItem.commands(), 3, true));
+        placeholders.put("{command_count}", String.valueOf(commandCount));
+        placeholders.put("{total}", String.valueOf(commandCount));
+        placeholders.put("{first_command}", firstCommand);
+        placeholders.put("{summary}", summary);
+        placeholders.put("{lore_count}", String.valueOf(loreCount));
+        placeholders.put("{lore_values}", formatList(commandItem.lore(), 3, false));
+        placeholders.put("{first_lore}", loreCount > 0 ? commandItem.lore().get(0) : "");
+        placeholders.put("{custom_model_data}", commandItem.customModelData() != null
                 ? String.valueOf(commandItem.customModelData())
                 : "None");
         return placeholders;
@@ -252,19 +253,20 @@ final class CommandItemUiComposer {
                                           Map<String, String> generic,
                                           CommandItem.Builder draft) {
         String result = applyPlaceholders(input, generic);
-        result = result.replace("%material%", draft.materialKey());
-        result = result.replace("%name%", draft.displayName());
-        result = result.replace("%lore_count%", String.valueOf(draft.lore().size()));
-        result = result.replace("%command_count%", String.valueOf(draft.commands().size()));
-        result = result.replace("%custom_model_data%", draft.customModelData() != null
-                ? String.valueOf(draft.customModelData())
-                : "None");
+        result = plugin.applyPlaceholderVariants(result, "material", draft.materialKey());
+        result = plugin.applyPlaceholderVariants(result, "name", draft.displayName());
+        result = plugin.applyPlaceholderVariants(result, "lore_count", String.valueOf(draft.lore().size()));
+        result = plugin.applyPlaceholderVariants(result, "command_count", String.valueOf(draft.commands().size()));
+        result = plugin.applyPlaceholderVariants(result, "custom_model_data",
+                draft.customModelData() != null ? String.valueOf(draft.customModelData()) : "None");
+
         if (!draft.commands().isEmpty()) {
-            result = result.replace("%first_command%", draft.commands().get(0));
-            result = result.replace("%summary%", summarizeCommand(draft.commands().get(0)));
+            String firstCommand = draft.commands().get(0);
+            result = plugin.applyPlaceholderVariants(result, "first_command", firstCommand);
+            result = plugin.applyPlaceholderVariants(result, "summary", summarizeCommand(firstCommand));
         } else {
-            result = result.replace("%first_command%", "");
-            result = result.replace("%summary%", "");
+            result = plugin.applyPlaceholderVariants(result, "first_command", "");
+            result = plugin.applyPlaceholderVariants(result, "summary", "");
         }
         return result;
     }
@@ -333,7 +335,7 @@ final class CommandItemUiComposer {
 
         String[] parts = trimmed.split("\\s+");
         if (parts.length >= 3 && parts[0].equalsIgnoreCase("give")) {
-            String item = parts[2].replace("%player%", "@p");
+            String item = plugin.applyPlaceholderVariants(parts[2], "player", "@p");
             int amount = 1;
             if (parts.length >= 4) {
                 try {
@@ -347,7 +349,7 @@ final class CommandItemUiComposer {
 
         String main = parts[0];
         if (parts.length > 1) {
-            return main + " " + parts[1].replace("%player%", "@p");
+            return main + " " + plugin.applyPlaceholderVariants(parts[1], "player", "@p");
         }
         return main;
     }

@@ -52,12 +52,16 @@ import com.yusaki.lammailbox.service.MailDelivery;
 import com.yusaki.lammailbox.service.MailService;
 import com.yusaki.lammailbox.session.MailCreationSession;
 import com.yusaki.lammailbox.config.MailBoxConfigUpdater;
+import org.yusaki.lib.YskLib;
+import org.yusaki.lib.modules.MessageManager;
 
 public class LamMailBox extends JavaPlugin implements Listener {
     private FileConfiguration config;
     private MailRepository mailRepository;
     private MailService mailService;
     private StorageSettings.BackendType activeBackend;
+    private YskLib yskLib;
+    private MessageManager messageManager;
     private Map<UUID, MailCreationSession> mailSessions;
     private Map<UUID, String> awaitingInput;
     private Map<UUID, Boolean> inMailCreation;
@@ -93,6 +97,17 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
         saveDefaultConfig();
         config = getConfig();
+
+        // Initialize YskLib MessageManager
+        yskLib = (YskLib) getServer().getPluginManager().getPlugin("YskLib");
+        if (yskLib == null) {
+            getLogger().severe("YskLib not found! Please install YskLib 1.6.4 or above.");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+        yskLib.loadMessages(this);
+        messageManager = yskLib.getMessageManager();
+
         StorageSettings storageSettings = StorageSettings.load(this);
         mailRepository = createRepository(storageSettings);
         mailService = new DefaultMailService(this, mailRepository, foliaLib);
@@ -355,7 +370,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
             case "receiver":
                 success = mailCreationController.handleReceiverInput(player, message, session);
                 customSubtitle = success
-                        ? config.getString("messages.current-receiver").replace("%receiver%", message)
+                        ? applyPlaceholderVariants(config.getString("messages.current-receiver"), "receiver", message)
                         : config.getString("messages.invalid-receiver");
                 reopenMailCreation = true;
                 break;
@@ -366,23 +381,29 @@ public class LamMailBox extends JavaPlugin implements Listener {
                 break;
             case "command":
                 success = mailCreationController.handleCommandInput(player, message, session);
-                customSubtitle = config.getString("messages.command-format-display")
-                        .replace("%command%", message);
+                customSubtitle = applyPlaceholderVariants(
+                        config.getString("messages.command-format-display"),
+                        "command",
+                        message);
                 mailCreationController.reopenCreationAsync(player);
                 break;
             case "schedule-date":
                 success = mailCreationController.handleDateInput(player, message, session, true);
                 customSubtitle = success && session.getScheduleDate() != null
-                        ? config.getString("messages.schedule-set")
-                        .replace("%date%", new Date(session.getScheduleDate()).toString())
+                        ? applyPlaceholderVariants(
+                                config.getString("messages.schedule-set"),
+                                "date",
+                                new Date(session.getScheduleDate()).toString())
                         : config.getString("messages.invalid-date-format");
                 reopenMailCreation = true;
                 break;
             case "expire-date":
                 success = mailCreationController.handleDateInput(player, message, session, false);
                 customSubtitle = success && session.getExpireDate() != null
-                        ? config.getString("messages.expire-set")
-                        .replace("%date%", new Date(session.getExpireDate()).toString())
+                        ? applyPlaceholderVariants(
+                                config.getString("messages.expire-set"),
+                                "date",
+                                new Date(session.getExpireDate()).toString())
                         : config.getString("messages.invalid-date-format");
                 reopenMailCreation = true;
                 break;
@@ -421,8 +442,10 @@ public class LamMailBox extends JavaPlugin implements Listener {
                     if (trimmed.isEmpty() || trimmed.equalsIgnoreCase("clear") || trimmed.equalsIgnoreCase("none") || trimmed.equalsIgnoreCase("reset")) {
                         customSubtitle = config.getString("messages.command-item-model-cleared", "&a✔ Custom model data cleared.");
                     } else {
-                        customSubtitle = config.getString("messages.command-item-model-set", "&a✔ Custom model data updated.")
-                                .replace("%value%", trimmed);
+                        customSubtitle = applyPlaceholderVariants(
+                                config.getString("messages.command-item-model-set", "&a✔ Custom model data updated."),
+                                "value",
+                                trimmed);
                     }
                 } else {
                     customSubtitle = config.getString("messages.command-item-model-invalid", "&c✖ Invalid custom model data.");
@@ -490,16 +513,99 @@ public class LamMailBox extends JavaPlugin implements Listener {
         Long scheduleDate = session.getScheduleDate();
         if (scheduleDate != null && scheduleDate > System.currentTimeMillis()) {
             sender.sendMessage(colorize(config.getString("messages.prefix") +
-                    config.getString("messages.schedule-set")
-                            .replace("%date%", new Date(scheduleDate).toString())));
+                    applyPlaceholderVariants(config.getString("messages.schedule-set"),
+                            "date",
+                            new Date(scheduleDate).toString())));
         } else {
             sender.sendMessage(colorize(config.getString("messages.prefix") +
                     config.getString("messages.mail-sent")));
         }
     }
 
+    /**
+     * @deprecated Use getMessage() with MessageManager instead
+     */
+    @Deprecated
     public String colorize(String text) {
         return text.replace("&", "§");
+    }
+
+    public String applyPlaceholderVariants(String template, String key, String value) {
+        if (template == null || key == null) {
+            return template;
+        }
+
+        String normalized = normalizePlaceholderKey(key);
+        String safeValue = value == null ? "" : value;
+        String result = template;
+
+        result = result.replace("{" + normalized + "}", safeValue);
+        result = result.replace("%" + normalized + "%", safeValue);
+
+        if (!key.equals("{" + normalized + "}") && !key.equals("%" + normalized + "%")) {
+            result = result.replace(key, safeValue);
+        }
+
+        return result;
+    }
+
+    public String applyPlaceholderVariants(String template, Map<String, String> placeholders) {
+        if (template == null || placeholders == null || placeholders.isEmpty()) {
+            return template;
+        }
+
+        String result = template;
+        for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+            result = applyPlaceholderVariants(result, entry.getKey(), entry.getValue());
+        }
+        return result;
+    }
+
+    private String normalizePlaceholderKey(String key) {
+        if (key == null || key.length() < 2) {
+            return key == null ? "" : key;
+        }
+
+        if ((key.startsWith("{") && key.endsWith("}")) || (key.startsWith("%") && key.endsWith("%"))) {
+            return key.substring(1, key.length() - 1);
+        }
+
+        return key;
+    }
+
+    /**
+     * Get a message from config with placeholders
+     */
+    public String getMessage(String key, Map<String, String> placeholders) {
+        return messageManager.getMessage(this, key, placeholders);
+    }
+
+    /**
+     * Get a message from config without placeholders
+     */
+    public String getMessage(String key) {
+        return messageManager.getMessage(this, key);
+    }
+
+    /**
+     * Send a message to a sender with placeholders
+     */
+    public void sendMessage(org.bukkit.command.CommandSender sender, String key, Map<String, String> placeholders) {
+        messageManager.sendMessage(this, sender, key, placeholders);
+    }
+
+    /**
+     * Send a message to a sender without placeholders
+     */
+    public void sendMessage(org.bukkit.command.CommandSender sender, String key) {
+        messageManager.sendMessage(this, sender, key);
+    }
+
+    /**
+     * Create a placeholder map from key-value pairs
+     */
+    public Map<String, String> placeholders(String... keyValuePairs) {
+        return MessageManager.placeholders(keyValuePairs);
     }
 
     public String getMailingsMessage(String key, String fallback) {
@@ -531,8 +637,10 @@ public class LamMailBox extends JavaPlugin implements Listener {
     private void sendMailNotification(Player receiver, String mailId, String sender) {
         // Chat notification
         if (config.getBoolean("settings.notification.chat-enabled")) {
-            String chatMessage = config.getString("messages.new-mail-clickable")
-                    .replace("%sender%", sender);
+            String chatMessage = applyPlaceholderVariants(
+                    config.getString("messages.new-mail-clickable"),
+                    "sender",
+                    sender);
 
             TextComponent message = new TextComponent(colorize(config.getString("messages.prefix") + chatMessage));
             String command = "/" + getPrimaryCommand() + " view " + mailId;
@@ -542,10 +650,14 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
         // Title notification
         if (config.getBoolean("settings.notification.title-enabled")) {
-            String title = colorize(config.getString("titles.notification.title")
-                    .replace("%sender%", sender));
-            String subtitle = colorize(config.getString("titles.notification.subtitle")
-                    .replace("%sender%", sender));
+            String title = colorize(applyPlaceholderVariants(
+                    config.getString("titles.notification.title"),
+                    "sender",
+                    sender));
+            String subtitle = colorize(applyPlaceholderVariants(
+                    config.getString("titles.notification.subtitle"),
+                    "sender",
+                    sender));
 
             int fadeIn = config.getInt("titles.notification.fadein");
             int stay = config.getInt("titles.notification.stay");

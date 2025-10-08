@@ -89,9 +89,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
     private void applyCommandIconText(ItemMeta meta, String basePath, int commandCount, String summary) {
         String displayName = config().getString(basePath + ".name");
         if (displayName != null && !displayName.isBlank()) {
-            meta.setDisplayName(plugin.colorize(displayName
-                    .replace("%count%", String.valueOf(commandCount))
-                    .replace("%summary%", summary)));
+            meta.setDisplayName(plugin.colorize(format(displayName,
+                    "count", String.valueOf(commandCount),
+                    "summary", summary)));
         }
 
         List<String> rawLore = config().getStringList(basePath + ".lore");
@@ -99,9 +99,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             rawLore = Collections.singletonList("&7Contains hidden console actions");
         }
         List<String> lore = rawLore.stream()
-                .map(line -> plugin.colorize(line
-                        .replace("%count%", String.valueOf(commandCount))
-                        .replace("%summary%", summary)))
+                .map(line -> plugin.colorize(format(line,
+                        "count", String.valueOf(commandCount),
+                        "summary", summary)))
                 .collect(Collectors.toList());
         meta.setLore(lore);
         itemStyler.apply(meta, basePath);
@@ -234,8 +234,10 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         if (isEnabled("gui.sent-mail-view.items.receiver-head")) {
             ItemStack head = new ItemStack(Material.valueOf(config().getString("gui.sent-mail-view.items.receiver-head.material")));
             SkullMeta headMeta = (SkullMeta) head.getItemMeta();
-            headMeta.setDisplayName(plugin.colorize(config().getString("gui.sent-mail-view.items.receiver-head.name")
-                    .replace("%receiver%", receiver)));
+            headMeta.setDisplayName(plugin.colorize(format(
+                    config().getString("gui.sent-mail-view.items.receiver-head.name"),
+                    "receiver",
+                    receiver)));
             // Only set owning player if receiver is not empty and contains valid characters
             if (receiver != null && !receiver.trim().isEmpty() && receiver.matches("^[a-zA-Z0-9_]{1,16}$")) {
                 headMeta.setOwningPlayer(Bukkit.getOfflinePlayer(receiver));
@@ -308,8 +310,10 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         if (isEnabled("gui.mail-view.items.sender-head")) {
             ItemStack head = new ItemStack(Material.valueOf(config().getString("gui.mail-view.items.sender-head.material")));
             SkullMeta headMeta = (SkullMeta) head.getItemMeta();
-            headMeta.setDisplayName(plugin.colorize(config().getString("gui.mail-view.items.sender-head.name")
-                    .replace("%sender%", sender)));
+            headMeta.setDisplayName(plugin.colorize(format(
+                    config().getString("gui.mail-view.items.sender-head.name"),
+                    "sender",
+                    sender)));
             // Only set owning player if sender is not empty and contains valid characters
             if (sender != null && !sender.trim().isEmpty() && sender.matches("^[a-zA-Z0-9_]{1,16}$")) {
                 headMeta.setOwningPlayer(Bukkit.getOfflinePlayer(sender));
@@ -432,7 +436,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         String viewingAs = plugin.getViewingAsPlayer().get(viewer.getUniqueId());
         if (viewingAs != null && !viewer.getUniqueId().equals(target.getUniqueId())) {
             String disabledNameFormat = config().getString("gui.main.items.create-mail.disabled.name-format", "&c&l%name%");
-            bookMeta.setDisplayName(plugin.colorize(disabledNameFormat.replace("%name%", baseName)));
+            bookMeta.setDisplayName(plugin.colorize(format(disabledNameFormat, "name", baseName)));
             List<String> disabledLore = config().getStringList("gui.main.items.create-mail.disabled.lore");
             if (!disabledLore.isEmpty()) {
                 bookLore.addAll(disabledLore);
@@ -657,18 +661,18 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         long expireAt = record.expireDate() != null ? record.expireDate() : 0L;
 
         String displayName = config().getString("gui.sent-mail.items.sent-mail-display.name", "");
-        meta.setDisplayName(plugin.colorize(displayName
-                .replace("%receiver%", receiver)
-                .replace("%sent_date%", formatDate(sentAt))
-                .replace("%expire_date%", formatDate(expireAt))));
+        meta.setDisplayName(plugin.colorize(format(displayName,
+                "receiver", receiver,
+                "sent_date", formatDate(sentAt),
+                "expire_date", formatDate(expireAt))));
 
         List<String> lore = config().getStringList("gui.sent-mail.items.sent-mail-display.lore").stream()
-                .map(line -> plugin.colorize(line
-                        .replace("%receiver%", receiver)
-                        .replace("%sent_date%", formatDate(sentAt))
-                        .replace("%expire_date%", formatDate(expireAt))
-                        .replace("%sent%", formatDate(sentAt))
-                        .replace("%expire%", formatDate(expireAt))))
+                .map(line -> plugin.colorize(format(line,
+                        "receiver", receiver,
+                        "sent_date", formatDate(sentAt),
+                        "expire_date", formatDate(expireAt),
+                        "sent", formatDate(sentAt),
+                        "expire", formatDate(expireAt))))
                 .collect(Collectors.toList());
         meta.setLore(lore);
         itemStyler.apply(meta, "gui.sent-mail.items.sent-mail-display", false);
@@ -682,13 +686,31 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                                          String message,
                                          long sentAt,
                                          long expireAt) {
-        return input
-                .replace("%sender%", sender)
-                .replace("%message%", message.replace("\n", " "))
-                .replace("%sent%", formatDate(sentAt))
-                .replace("%sent_date%", formatDate(sentAt))
-                .replace("%expire%", formatDate(expireAt))
-                .replace("%expire_date%", formatDate(expireAt));
+        return format(input,
+                "sender", sender,
+                "message", message.replace("\n", " "),
+                "sent", formatDate(sentAt),
+                "sent_date", formatDate(sentAt),
+                "expire", formatDate(expireAt),
+                "expire_date", formatDate(expireAt));
+    }
+
+    private String format(String template, String... keyValuePairs) {
+        if (template == null || keyValuePairs == null || keyValuePairs.length == 0) {
+            return template;
+        }
+
+        Map<String, String> replacements = new HashMap<>();
+        for (int i = 0; i + 1 < keyValuePairs.length; i += 2) {
+            String key = keyValuePairs[i];
+            if (key == null) {
+                continue;
+            }
+            String value = keyValuePairs[i + 1];
+            replacements.put(key, value);
+        }
+
+        return plugin.applyPlaceholderVariants(template, replacements);
     }
 
     private String formatDate(long millis) {

@@ -102,8 +102,9 @@ public class MailCreationController {
             return false;
         }
         draft.material(material.name());
-        player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-material-set", "&a✔ Material set to %material%")
-                .replace("%material%", material.name())));
+        String materialTemplate = config().getString("messages.command-item-material-set", "&a✔ Material set to %material%");
+        player.sendMessage(plugin.colorize(prefix() +
+                plugin.applyPlaceholderVariants(materialTemplate, "material", material.name())));
         return true;
     }
 
@@ -162,8 +163,9 @@ public class MailCreationController {
                 throw new NumberFormatException("negative");
             }
             draft.customModelData(value);
-            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-model-set", "&a✔ Custom model data updated."))
-                    .replace("%value%", String.valueOf(value)));
+            String template = config().getString("messages.command-item-model-set", "&a✔ Custom model data updated.");
+            String formatted = plugin.applyPlaceholderVariants(template, "value", String.valueOf(value));
+            player.sendMessage(plugin.colorize(prefix() + formatted));
             return true;
         } catch (NumberFormatException ex) {
             player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-model-invalid", "&c✖ Invalid custom model data.")));
@@ -224,12 +226,14 @@ public class MailCreationController {
 
             if (isSchedule) {
                 session.setScheduleDate(timestamp);
-                player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
-                        config().getString("messages.schedule-set").replace("%date%", calendar.getTime().toString())));
+                String template = config().getString("messages.schedule-set");
+                String formatted = plugin.applyPlaceholderVariants(template, "date", calendar.getTime().toString());
+                player.sendMessage(plugin.colorize(config().getString("messages.prefix") + formatted));
             } else {
                 session.setExpireDate(timestamp);
-                player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
-                        config().getString("messages.expire-set").replace("%date%", calendar.getTime().toString())));
+                String template = config().getString("messages.expire-set");
+                String formatted = plugin.applyPlaceholderVariants(template, "date", calendar.getTime().toString());
+                player.sendMessage(plugin.colorize(config().getString("messages.prefix") + formatted));
             }
             return true;
         } catch (Exception e) {
