@@ -83,7 +83,7 @@ Need examples or deeper guidance? Check the wiki:
 
 * Paper or Folia 1.20+
 * Java 21 runtime
-* [YskLib](https://github.com/YusakiDev/YskLib/releases) 1.6.4 or above
+* [YskLib](https://github.com/YusakiDev/YskLib/releases) 1.6.5 or above
 
 ## Support
 

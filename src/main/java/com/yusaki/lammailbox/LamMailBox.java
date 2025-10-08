@@ -11,10 +11,7 @@ import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
-import org.bukkit.command.CommandMap;
 import org.bukkit.command.PluginCommand;
-import org.bukkit.command.SimpleCommandMap;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -53,6 +50,7 @@ import com.yusaki.lammailbox.service.MailService;
 import com.yusaki.lammailbox.session.MailCreationSession;
 import com.yusaki.lammailbox.config.MailBoxConfigUpdater;
 import org.yusaki.lib.YskLib;
+import org.yusaki.lib.modules.CommandAliasManager;
 import org.yusaki.lib.modules.MessageManager;
 
 public class LamMailBox extends JavaPlugin implements Listener {
@@ -70,6 +68,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
     private Map<UUID, Integer> mailViewPages;
     private Map<UUID, Integer> mailboxPages;
     private Map<UUID, Integer> sentMailboxPages;
+    private String primaryCommand = "lmb";
     private FoliaLib foliaLib;
     private InventoryClickHandler inventoryClickHandler;
     private MailGuiFactory mailGuiFactory;
@@ -101,7 +100,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
         // Initialize YskLib MessageManager
         yskLib = (YskLib) getServer().getPluginManager().getPlugin("YskLib");
         if (yskLib == null) {
-            getLogger().severe("YskLib not found! Please install YskLib 1.6.4 or above.");
+            getLogger().severe("YskLib not found! Please install YskLib 1.6.5 or above.");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
@@ -122,7 +121,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
         inventoryClickHandler = new InventoryClickHandler(this);
         mailGuiFactory = new ConfigMailGuiFactory(this);
         mailCreationController = new MailCreationController(this);
-        applyCommandAliases();
+        updateCommandAliases();
 
         mailingConfigLoader = new MailingConfigLoader(this);
         mailingConfigLoader.saveDefaultIfMissing();
@@ -152,7 +151,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
             reloadConfig();
             config = getConfig();
             mailingAutoCleanup = config.getBoolean("mailings.auto-cleanup", true);
-            applyCommandAliases();
+            updateCommandAliases();
             reloadMailings();
             sender.sendMessage(colorize(config.getString("messages.reload-success")));
 
@@ -816,60 +815,13 @@ public class LamMailBox extends JavaPlugin implements Listener {
         getLogger().info("Mailing status cleanup executed for IDs: " + activeIds);
     }
 
-    private void applyCommandAliases() {
-        PluginCommand command = getCommand("lmb");
-        if (command == null) {
-            return;
-        }
-
-        FileConfiguration config = getConfig();
-        ConfigurationSection aliasSection = config.getConfigurationSection("settings.command-aliases");
-        List<String> aliases = aliasSection != null ? aliasSection.getStringList("base") : Collections.emptyList();
-        if (aliases == null) {
-            aliases = Collections.emptyList();
-        }
-        command.setAliases(aliases);
-
-        SimpleCommandMap commandMap = findCommandMap();
-        if (commandMap == null) {
-            getLogger().warning("Unable to re-register command aliases for /lmb; command map not accessible.");
-            return;
-        }
-
-        try {
-            command.unregister(commandMap);
-            commandMap.register(getDescription().getName().toLowerCase(Locale.ROOT), command);
-        } catch (Exception ex) {
-            getLogger().warning("Failed to re-register /lmb aliases: " + ex.getMessage());
-        }
-    }
-
-    private SimpleCommandMap findCommandMap() {
-        CommandMap map = null;
-        try {
-            map = (CommandMap) Bukkit.getServer().getClass().getMethod("getCommandMap").invoke(Bukkit.getServer());
-        } catch (ReflectiveOperationException ignored) {
-        }
-
-        if (map instanceof SimpleCommandMap) {
-            return (SimpleCommandMap) map;
-        }
-
-        try {
-            var field = Bukkit.getServer().getClass().getDeclaredField("commandMap");
-            field.setAccessible(true);
-            map = (CommandMap) field.get(Bukkit.getServer());
-            if (map instanceof SimpleCommandMap) {
-                return (SimpleCommandMap) map;
-            }
-        } catch (ReflectiveOperationException ignored) {
-        }
-        return null;
+    private void updateCommandAliases() {
+        List<String> aliases = CommandAliasManager.applyAliases(this, "lmb", getConfig(), "settings.command-aliases.base");
+        primaryCommand = aliases.isEmpty() ? "lmb" : aliases.get(0);
     }
 
     private String getPrimaryCommand() {
-        List<String> aliases = config.getStringList("settings.command-aliases.base");
-        return aliases.isEmpty() ? "lmb" : aliases.get(0);
+        return primaryCommand;
     }
 
     public List<MailingDefinition> getMailingDefinitions() {
