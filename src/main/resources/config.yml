@@ -1,4 +1,4 @@
-version: 1.6
+version: 1.7
 
 settings:
   max-mails-per-player: 54
@@ -37,13 +37,14 @@ gui:
       # Decoration entries render non-interactive fillers. Optional fields:
       # - enabled: false to hide the filler.
       # - lore: list of hover lines (color codes allowed).
-      # - command / commands: console command(s) run on click (%player%, %uuid%).
+      # - command / commands: console command(s) run on click (supports both %player% and %player%, %uuid% and %uuid%).
       # - custom-model-data: numeric override for resource-pack models.
       border:
         enabled: true
         material: BLACK_STAINED_GLASS_PANE
         name: ' '
         # Optional console command(s) run as console when clicked by a player.
+        # Supports both old %player% and new %player% placeholder formats for backward compatibility
         # commands:
         #   - 'say Hello %player%'
         #   - 'give %player% minecraft:cookie'
@@ -113,7 +114,7 @@ gui:
       # Decoration entries render non-interactive fillers. Optional fields:
       # - enabled: false to hide the filler.
       # - lore: list of hover lines (colour codes allowed).
-      # - command / commands: console command(s) run on click (%player%, %uuid%).
+      # - command / commands: console command(s) run on click (supports both %player% and %player%, %uuid% and %uuid%).
       # - custom-model-data: numeric override for resource-pack models.
       border:
         enabled: true
@@ -165,7 +166,7 @@ gui:
       # Decoration entries render non-interactive fillers. Optional fields:
       # - enabled: false to hide the filler.
       # - lore: list of hover lines (colour codes allowed).
-      # - command / commands: console command(s) run on click (%player%, %uuid%).
+      # - command / commands: console command(s) run on click (supports both %player% and %player%, %uuid% and %uuid%).
       # - custom-model-data: numeric override for resource-pack models.
       border:
         enabled: true
@@ -220,7 +221,7 @@ gui:
       # Decoration entries render non-interactive fillers. Optional fields:
       # - enabled: false to hide the filler.
       # - lore: list of hover lines (colour codes allowed).
-      # - command / commands: console command(s) run on click (%player%, %uuid%).
+      # - command / commands: console command(s) run on click (supports both %player% and %player%, %uuid% and %uuid%).
       # - custom-model-data: numeric override for resource-pack models.
       border:
         enabled: true
@@ -422,7 +423,7 @@ gui:
       # Decoration entries render non-interactive fillers. Optional fields:
       # - enabled: false to hide the filler.
       # - lore: list of hover lines (colour codes allowed).
-      # - command / commands: console command(s) run on click (%player%, %uuid%).
+      # - command / commands: console command(s) run on click (supports both %player% and %player%, %uuid% and %uuid%).
       # - custom-model-data: numeric override for resource-pack models.
       border:
         enabled: true
