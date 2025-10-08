@@ -23,7 +23,7 @@ settings:
     pitch: 1.0
 
   command-aliases:
-    base: [mailbox, mail, mb]
+    lmb: [mailbox, mail, mb]
 
 mailings:
   auto-cleanup: true

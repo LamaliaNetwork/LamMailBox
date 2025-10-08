@@ -816,7 +816,20 @@ public class LamMailBox extends JavaPlugin implements Listener {
     }
 
     private void updateCommandAliases() {
-        List<String> aliases = CommandAliasManager.applyAliases(this, "lmb", getConfig(), "settings.command-aliases.base");
+        FileConfiguration config = getConfig();
+        String primaryPath = "settings.command-aliases.lmb";
+        String legacyPath = "settings.command-aliases.base";
+
+        List<String> aliases;
+        if (config.contains(primaryPath)) {
+            aliases = CommandAliasManager.applyAliases(this, "lmb", config, primaryPath);
+            if (aliases.isEmpty() && config.contains(legacyPath)) {
+                aliases = CommandAliasManager.applyAliases(this, "lmb", config, legacyPath);
+            }
+        } else {
+            aliases = CommandAliasManager.applyAliases(this, "lmb", config, legacyPath);
+        }
+
         primaryCommand = aliases.isEmpty() ? "lmb" : aliases.get(0);
     }
 

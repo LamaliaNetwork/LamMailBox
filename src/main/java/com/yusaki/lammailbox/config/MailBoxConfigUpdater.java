@@ -98,8 +98,12 @@ public class MailBoxConfigUpdater {
         if (aliasSection == null) {
             aliasSection = config.createSection("settings.command-aliases");
         }
-        if (!aliasSection.contains("base")) {
-            aliasSection.set("base", Arrays.asList("mailbox", "mail", "mb"));
+        if (!aliasSection.contains("lmb")) {
+            var aliases = aliasSection.getStringList("base");
+            if (aliases == null || aliases.isEmpty()) {
+                aliases = Arrays.asList("mailbox", "mail", "mb");
+            }
+            aliasSection.set("lmb", aliases);
         }
 
         // Add any config-specific migrations here
