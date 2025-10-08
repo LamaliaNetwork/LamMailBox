@@ -526,6 +526,7 @@ messages:
   enter-command-item-lore: '&eEnter lore line. Right-click the lore button to remove the last entry.'
   enter-command-item-command: '&eEnter command (without /). Right-click the command button to remove the last entry.'
   enter-command-item-custom-model: '&eEnter custom model data (number) or type CLEAR.'
+  command-format-display: '&7Command: &f%command%'
   incomplete-mail: '&c⚠ Cannot send mail - some details are missing!'
   current-receiver: '&a✉ Sending to: &f%receiver%'
   current-message: '&a✎ Your message:'
