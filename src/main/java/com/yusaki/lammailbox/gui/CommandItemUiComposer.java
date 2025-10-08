@@ -74,7 +74,7 @@ final class CommandItemUiComposer {
                 .map(line -> plugin.applyPlaceholderVariants(line,
                         "count",
                         String.valueOf(session.getCommandItems().size())))
-                .map(plugin::colorize)
+                .map(plugin::legacy)
                 .collect(Collectors.toList());
 
         if (!session.getCommandItems().isEmpty()) {
@@ -126,9 +126,9 @@ final class CommandItemUiComposer {
             return item;
         }
 
-        meta.setDisplayName(plugin.colorize(config().getString(path + ".name", "&c" + action)));
+        meta.setDisplayName(plugin.legacy(config().getString(path + ".name", "&c" + action)));
         meta.setLore(config().getStringList(path + ".lore").stream()
-                .map(plugin::colorize)
+                .map(plugin::legacy)
                 .collect(Collectors.toList()));
         itemStyler.apply(meta, path);
         meta.getPersistentDataContainer().set(commandItemActionKey, PersistentDataType.STRING, action);
@@ -158,12 +158,12 @@ final class CommandItemUiComposer {
         }
 
         String name = config().getString(path + ".name", "&eEdit");
-        meta.setDisplayName(plugin.colorize(applyPlaceholders(name, placeholders)));
+        meta.setDisplayName(plugin.legacy(applyPlaceholders(name, placeholders)));
 
         List<String> loreTemplate = config().getStringList(path + ".lore");
         List<String> lore = loreTemplate.stream()
                 .map(line -> applyDraftPlaceholders(line, placeholders, draft))
-                .map(plugin::colorize)
+                .map(plugin::legacy)
                 .collect(Collectors.toList());
 
         if ("lore".equals(action) && !draft.lore().isEmpty()) {
@@ -172,7 +172,7 @@ final class CommandItemUiComposer {
             appendDetailLines(lore, "&7Commands:", draft.commands(), 10, true);
         } else if ("custom-model".equals(action)) {
             String value = draft.customModelData() != null ? String.valueOf(draft.customModelData()) : "None";
-            lore.add(plugin.colorize("&7Current: &f" + value));
+            lore.add(plugin.legacy("&7Current: &f" + value));
         }
 
         if (!lore.isEmpty()) {
@@ -235,13 +235,13 @@ final class CommandItemUiComposer {
         Map<String, String> placeholders = createCommandItemPlaceholders(commandItem);
         String overrideName = config().getString(legacyPath + ".name");
         if (overrideName != null && !overrideName.isBlank()) {
-            meta.setDisplayName(plugin.colorize(applyPlaceholders(overrideName, placeholders)));
+            meta.setDisplayName(plugin.legacy(applyPlaceholders(overrideName, placeholders)));
         }
 
         List<String> configuredLore = config().getStringList(legacyPath + ".lore");
         if (!configuredLore.isEmpty()) {
             List<String> lore = configuredLore.stream()
-                    .map(line -> plugin.colorize(applyPlaceholders(line, placeholders)))
+                    .map(line -> plugin.legacy(applyPlaceholders(line, placeholders)))
                     .collect(Collectors.toList());
             meta.setLore(lore);
         }
@@ -277,10 +277,10 @@ final class CommandItemUiComposer {
             return;
         }
         if (!lore.isEmpty()) {
-            lore.add(plugin.colorize("&7"));
+            lore.add(plugin.legacy("&7"));
         }
         lore.addAll(actionLore.stream()
-                .map(plugin::colorize)
+                .map(plugin::legacy)
                 .collect(Collectors.toList()));
     }
 
@@ -293,15 +293,15 @@ final class CommandItemUiComposer {
             return;
         }
         if (!target.isEmpty()) {
-            target.add(plugin.colorize("&7"));
+            target.add(plugin.legacy("&7"));
         }
-        target.add(plugin.colorize(header));
+        target.add(plugin.legacy(header));
         for (String value : values.stream().limit(limit).toList()) {
             String text = summarizeCommands ? Optional.ofNullable(summarizeCommand(value)).orElse(value) : value;
-            target.add(plugin.colorize("&f• " + text));
+            target.add(plugin.legacy("&f• " + text));
         }
         if (values.size() > limit) {
-            target.add(plugin.colorize("&7…"));
+            target.add(plugin.legacy("&7…"));
         }
     }
 

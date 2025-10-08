@@ -89,7 +89,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
     private void applyCommandIconText(ItemMeta meta, String basePath, int commandCount, String summary) {
         String displayName = config().getString(basePath + ".name");
         if (displayName != null && !displayName.isBlank()) {
-            meta.setDisplayName(plugin.colorize(format(displayName,
+            meta.setDisplayName(plugin.legacy(format(displayName,
                     "count", String.valueOf(commandCount),
                     "summary", summary)));
         }
@@ -99,7 +99,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             rawLore = Collections.singletonList("&7Contains hidden console actions");
         }
         List<String> lore = rawLore.stream()
-                .map(line -> plugin.colorize(format(line,
+                .map(line -> plugin.legacy(format(line,
                         "count", String.valueOf(commandCount),
                         "summary", summary)))
                 .collect(Collectors.toList());
@@ -178,7 +178,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
     @Override
     public Inventory createMailbox(Player viewer) {
         int size = config().getInt("gui.main.size");
-        Inventory inv = Bukkit.createInventory(null, size, plugin.colorize(config().getString("gui.main.title")));
+        Inventory inv = Bukkit.createInventory(null, size, plugin.legacy(config().getString("gui.main.title")));
         addDecorations(inv, "gui.main");
 
         addCreateMailButton(inv, viewer, viewer);
@@ -191,7 +191,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
     public Inventory createMailboxAs(Player admin, Player target) {
         int size = config().getInt("gui.main.size");
         String title = config().getString("gui.main.title") + " &7(as " + target.getName() + ")";
-        Inventory inv = Bukkit.createInventory(null, size, plugin.colorize(title));
+        Inventory inv = Bukkit.createInventory(null, size, plugin.legacy(title));
         addDecorations(inv, "gui.main");
 
         addCreateMailButton(inv, admin, target);
@@ -208,7 +208,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         if (viewingAs != null) {
             title += " &7(as " + viewingAs + ")";
         }
-        Inventory inv = Bukkit.createInventory(null, size, plugin.colorize(title));
+        Inventory inv = Bukkit.createInventory(null, size, plugin.legacy(title));
         addDecorations(inv, "gui.sent-mail");
 
         addBackButton(inv);
@@ -219,7 +219,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
     @Override
     public Inventory createSentMailView(Player viewer, String mailId) {
         int size = config().getInt("gui.sent-mail-view.size");
-        Inventory inv = Bukkit.createInventory(null, size, plugin.colorize(config().getString("gui.sent-mail-view.title")));
+        Inventory inv = Bukkit.createInventory(null, size, plugin.legacy(config().getString("gui.sent-mail-view.title")));
         addDecorations(inv, "gui.sent-mail-view");
 
         Optional<MailRecord> recordOpt = plugin.getMailRepository().findRecord(mailId);
@@ -234,7 +234,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         if (isEnabled("gui.sent-mail-view.items.receiver-head")) {
             ItemStack head = new ItemStack(Material.valueOf(config().getString("gui.sent-mail-view.items.receiver-head.material")));
             SkullMeta headMeta = (SkullMeta) head.getItemMeta();
-            headMeta.setDisplayName(plugin.colorize(format(
+            headMeta.setDisplayName(plugin.legacy(format(
                     config().getString("gui.sent-mail-view.items.receiver-head.name"),
                     "receiver",
                     receiver)));
@@ -250,9 +250,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         if (isEnabled("gui.sent-mail-view.items.message")) {
             ItemStack messageItem = new ItemStack(Material.valueOf(config().getString("gui.sent-mail-view.items.message.material")));
             ItemMeta messageMeta = messageItem.getItemMeta();
-            messageMeta.setDisplayName(plugin.colorize(config().getString("gui.sent-mail-view.items.message.name")));
+            messageMeta.setDisplayName(plugin.legacy(config().getString("gui.sent-mail-view.items.message.name")));
             List<String> messageLore = Arrays.stream(message.split("\n"))
-                    .map(line -> plugin.colorize("&f" + line))
+                    .map(line -> plugin.legacy("&f" + line))
                     .collect(Collectors.toList());
             messageMeta.setLore(messageLore);
             itemStyler.apply(messageMeta, "gui.sent-mail-view.items.message", false);
@@ -277,9 +277,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
                 && isEnabled("gui.sent-mail-view.items.delete-button")) {
             ItemStack deleteButton = new ItemStack(Material.valueOf(config().getString("gui.sent-mail-view.items.delete-button.material")));
             ItemMeta deleteMeta = deleteButton.getItemMeta();
-            deleteMeta.setDisplayName(plugin.colorize(config().getString("gui.sent-mail-view.items.delete-button.name")));
+            deleteMeta.setDisplayName(plugin.legacy(config().getString("gui.sent-mail-view.items.delete-button.name")));
             deleteMeta.setLore(config().getStringList("gui.sent-mail-view.items.delete-button.lore").stream()
-                    .map(plugin::colorize)
+                    .map(plugin::legacy)
                     .collect(Collectors.toList()));
             deleteMeta.getPersistentDataContainer().set(mailIdKey,
                     PersistentDataType.STRING, mailId);
@@ -295,7 +295,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
     @Override
     public Inventory createMailView(Player viewer, String mailId) {
         int size = config().getInt("gui.mail-view.size");
-        Inventory inv = Bukkit.createInventory(null, size, plugin.colorize(config().getString("gui.mail-view.title")));
+        Inventory inv = Bukkit.createInventory(null, size, plugin.legacy(config().getString("gui.mail-view.title")));
         addDecorations(inv, "gui.mail-view");
 
         Optional<MailRecord> recordOpt = plugin.getMailRepository().findRecord(mailId);
@@ -310,7 +310,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         if (isEnabled("gui.mail-view.items.sender-head")) {
             ItemStack head = new ItemStack(Material.valueOf(config().getString("gui.mail-view.items.sender-head.material")));
             SkullMeta headMeta = (SkullMeta) head.getItemMeta();
-            headMeta.setDisplayName(plugin.colorize(format(
+            headMeta.setDisplayName(plugin.legacy(format(
                     config().getString("gui.mail-view.items.sender-head.name"),
                     "sender",
                     sender)));
@@ -326,9 +326,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         if (isEnabled("gui.mail-view.items.message")) {
             ItemStack messageItem = new ItemStack(Material.valueOf(config().getString("gui.mail-view.items.message.material")));
             ItemMeta messageMeta = messageItem.getItemMeta();
-            messageMeta.setDisplayName(plugin.colorize(config().getString("gui.mail-view.items.message.name")));
+            messageMeta.setDisplayName(plugin.legacy(config().getString("gui.mail-view.items.message.name")));
             List<String> messageLore = Arrays.stream(message.split("\n"))
-                    .map(line -> plugin.colorize("&f" + line))
+                    .map(line -> plugin.legacy("&f" + line))
                     .collect(Collectors.toList());
             messageMeta.setLore(messageLore);
             itemStyler.apply(messageMeta, "gui.mail-view.items.message", false);
@@ -372,9 +372,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         if (claimSlot != null) {
             ItemStack claimButton = new ItemStack(Material.valueOf(config().getString("gui.mail-view.items.claim-button.material")));
             ItemMeta claimMeta = claimButton.getItemMeta();
-            claimMeta.setDisplayName(plugin.colorize(config().getString("gui.mail-view.items.claim-button.name")));
+            claimMeta.setDisplayName(plugin.legacy(config().getString("gui.mail-view.items.claim-button.name")));
             claimMeta.setLore(config().getStringList("gui.mail-view.items.claim-button.lore").stream()
-                    .map(plugin::colorize)
+                    .map(plugin::legacy)
                     .collect(Collectors.toList()));
             claimMeta.getPersistentDataContainer().set(mailIdKey,
                     PersistentDataType.STRING, mailId);
@@ -386,9 +386,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         if (dismissSlot != null) {
             ItemStack dismissButton = new ItemStack(Material.valueOf(config().getString("gui.mail-view.items.dismiss-button.material")));
             ItemMeta dismissMeta = dismissButton.getItemMeta();
-            dismissMeta.setDisplayName(plugin.colorize(config().getString("gui.mail-view.items.dismiss-button.name")));
+            dismissMeta.setDisplayName(plugin.legacy(config().getString("gui.mail-view.items.dismiss-button.name")));
             dismissMeta.setLore(config().getStringList("gui.mail-view.items.dismiss-button.lore").stream()
-                    .map(plugin::colorize)
+                    .map(plugin::legacy)
                     .collect(Collectors.toList()));
             dismissMeta.getPersistentDataContainer().set(mailIdKey,
                     PersistentDataType.STRING, mailId);
@@ -430,13 +430,13 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         ItemStack createBook = new ItemStack(Material.valueOf(config().getString("gui.main.items.create-mail.material")));
         ItemMeta bookMeta = createBook.getItemMeta();
         String baseName = config().getString("gui.main.items.create-mail.name", "");
-        bookMeta.setDisplayName(plugin.colorize(baseName));
+        bookMeta.setDisplayName(plugin.legacy(baseName));
         List<String> bookLore = new ArrayList<>(config().getStringList("gui.main.items.create-mail.lore"));
 
         String viewingAs = plugin.getViewingAsPlayer().get(viewer.getUniqueId());
         if (viewingAs != null && !viewer.getUniqueId().equals(target.getUniqueId())) {
             String disabledNameFormat = config().getString("gui.main.items.create-mail.disabled.name-format", "&c&l%name%");
-            bookMeta.setDisplayName(plugin.colorize(format(disabledNameFormat, "name", baseName)));
+            bookMeta.setDisplayName(plugin.legacy(format(disabledNameFormat, "name", baseName)));
             List<String> disabledLore = config().getStringList("gui.main.items.create-mail.disabled.lore");
             if (!disabledLore.isEmpty()) {
                 bookLore.addAll(disabledLore);
@@ -446,7 +446,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
             }
         }
 
-        bookMeta.setLore(bookLore.stream().map(plugin::colorize).collect(Collectors.toList()));
+        bookMeta.setLore(bookLore.stream().map(plugin::legacy).collect(Collectors.toList()));
         itemStyler.apply(bookMeta, "gui.main.items.create-mail");
         createBook.setItemMeta(bookMeta);
         inv.setItem(config().getInt("gui.main.items.create-mail.slot"), createBook);
@@ -458,9 +458,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
         ItemStack sentMailButton = new ItemStack(Material.valueOf(config().getString("gui.main.items.sent-mail.material")));
         ItemMeta sentMailMeta = sentMailButton.getItemMeta();
-        sentMailMeta.setDisplayName(plugin.colorize(config().getString("gui.main.items.sent-mail.name")));
+        sentMailMeta.setDisplayName(plugin.legacy(config().getString("gui.main.items.sent-mail.name")));
         sentMailMeta.setLore(config().getStringList("gui.main.items.sent-mail.lore").stream()
-                .map(plugin::colorize)
+                .map(plugin::legacy)
                 .collect(Collectors.toList()));
         itemStyler.apply(sentMailMeta, "gui.main.items.sent-mail");
         sentMailButton.setItemMeta(sentMailMeta);
@@ -473,9 +473,9 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         }
         ItemStack backButton = new ItemStack(Material.valueOf(config().getString("gui.sent-mail.items.back-button.material")));
         ItemMeta backMeta = backButton.getItemMeta();
-        backMeta.setDisplayName(plugin.colorize(config().getString("gui.sent-mail.items.back-button.name")));
+        backMeta.setDisplayName(plugin.legacy(config().getString("gui.sent-mail.items.back-button.name")));
         backMeta.setLore(config().getStringList("gui.sent-mail.items.back-button.lore").stream()
-                .map(plugin::colorize)
+                .map(plugin::legacy)
                 .collect(Collectors.toList()));
         itemStyler.apply(backMeta, "gui.sent-mail.items.back-button");
         backButton.setItemMeta(backMeta);
@@ -628,18 +628,18 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         long sentAt = record.sentDate();
         long expireAt = record.expireDate() != null ? record.expireDate() : 0L;
 
-        meta.setDisplayName(plugin.colorize(applyMailPlaceholders(displayName, sender, message, sentAt, expireAt)));
+        meta.setDisplayName(plugin.legacy(applyMailPlaceholders(displayName, sender, message, sentAt, expireAt)));
 
         List<String> loreTemplate = config().getStringList(itemPath + ".lore");
         List<String> lore = new ArrayList<>();
         for (String line : loreTemplate) {
-            lore.add(plugin.colorize(applyMailPlaceholders(line, sender, message, sentAt, expireAt)));
+            lore.add(plugin.legacy(applyMailPlaceholders(line, sender, message, sentAt, expireAt)));
         }
 
         String messagePrefix = config().getString(itemPath + ".message-prefix");
         if (messagePrefix != null && !messagePrefix.isEmpty() && !message.isEmpty()) {
             for (String line : message.split("\n")) {
-                lore.add(plugin.colorize(messagePrefix + line));
+                lore.add(plugin.legacy(messagePrefix + line));
             }
         }
 
@@ -661,13 +661,13 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
         long expireAt = record.expireDate() != null ? record.expireDate() : 0L;
 
         String displayName = config().getString("gui.sent-mail.items.sent-mail-display.name", "");
-        meta.setDisplayName(plugin.colorize(format(displayName,
+        meta.setDisplayName(plugin.legacy(format(displayName,
                 "receiver", receiver,
                 "sent_date", formatDate(sentAt),
                 "expire_date", formatDate(expireAt))));
 
         List<String> lore = config().getStringList("gui.sent-mail.items.sent-mail-display.lore").stream()
-                .map(line -> plugin.colorize(format(line,
+                .map(line -> plugin.legacy(format(line,
                         "receiver", receiver,
                         "sent_date", formatDate(sentAt),
                         "expire_date", formatDate(expireAt),
@@ -715,7 +715,7 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
 
     private String formatDate(long millis) {
         if (millis <= 0) {
-            return plugin.colorize(config().getString("messages.never-expire", "Never"));
+            return plugin.legacy(config().getString("messages.never-expire", "Never"));
         }
         return new Date(millis).toString();
     }
@@ -739,11 +739,11 @@ public class ConfigMailGuiFactory implements MailGuiFactory {
 
             ItemStack decorItem = new ItemStack(material);
             ItemMeta meta = decorItem.getItemMeta();
-            meta.setDisplayName(plugin.colorize(name));
+            meta.setDisplayName(plugin.legacy(name));
             List<String> loreLines = config().getStringList(path + ".lore");
             if (!loreLines.isEmpty()) {
                 meta.setLore(loreLines.stream()
-                        .map(plugin::colorize)
+                        .map(plugin::legacy)
                         .collect(Collectors.toList()));
             }
             // Always mark decorations with the decoration key so they can be replaced by pagination buttons

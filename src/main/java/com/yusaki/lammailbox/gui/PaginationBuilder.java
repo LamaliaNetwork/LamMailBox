@@ -137,7 +137,7 @@ final class PaginationBuilder {
                         "total", String.valueOf(totalPages)
                 ));
             } else {
-                name = plugin.colorize(name);
+                name = plugin.legacy(name);
             }
             meta.setDisplayName(name);
         }

@@ -52,7 +52,7 @@ final class MailCreationViewBuilder {
         ensureSessionDefaults(session);
 
         int size = config().getInt("gui.create-mail.size");
-        Inventory inv = Bukkit.createInventory(null, size, plugin.colorize(config().getString("gui.create-mail.title")));
+        Inventory inv = Bukkit.createInventory(null, size, plugin.legacy(config().getString("gui.create-mail.title")));
         decorationApplier.accept(inv, "gui.create-mail");
 
         addReceiverHead(inv, viewer, session);
@@ -67,7 +67,7 @@ final class MailCreationViewBuilder {
 
     Inventory createItemsEditor(Player viewer) {
         int size = config().getInt("gui.items.size");
-        Inventory inv = Bukkit.createInventory(null, size, plugin.colorize(config().getString("gui.items.title")));
+        Inventory inv = Bukkit.createInventory(null, size, plugin.legacy(config().getString("gui.items.title")));
 
         MailCreationSession session = plugin.getMailSessions().get(viewer.getUniqueId());
         if (session != null) {
@@ -78,9 +78,9 @@ final class MailCreationViewBuilder {
             ItemStack saveButton = new ItemStack(Material.valueOf(config().getString("gui.items.items.save-button.material")));
             ItemMeta saveMeta = saveButton.getItemMeta();
             if (saveMeta != null) {
-                saveMeta.setDisplayName(plugin.colorize(config().getString("gui.items.items.save-button.name")));
+                saveMeta.setDisplayName(plugin.legacy(config().getString("gui.items.items.save-button.name")));
                 saveMeta.setLore(config().getStringList("gui.items.items.save-button.lore").stream()
-                        .map(plugin::colorize)
+                        .map(plugin::legacy)
                         .collect(Collectors.toList()));
                 itemStyler.apply(saveMeta, "gui.items.items.save-button");
                 saveButton.setItemMeta(saveMeta);
@@ -99,7 +99,7 @@ final class MailCreationViewBuilder {
 
         String base = "gui.command-items-editor";
         int size = config().getInt(base + ".size", 45);
-        Inventory inv = Bukkit.createInventory(null, size, plugin.colorize(config().getString(base + ".title", "Command Items")));
+        Inventory inv = Bukkit.createInventory(null, size, plugin.legacy(config().getString(base + ".title", "Command Items")));
         decorationApplier.accept(inv, base);
 
         List<Integer> slots = config().getIntegerList(base + ".items.command-item.slots");
@@ -129,7 +129,7 @@ final class MailCreationViewBuilder {
         CommandItem.Builder draft = session.getCommandItemDraft();
         String base = "gui.command-item-creator";
         int size = config().getInt(base + ".size", 54);
-        Inventory inv = Bukkit.createInventory(null, size, plugin.colorize(config().getString(base + ".title", "Create Command Item")));
+        Inventory inv = Bukkit.createInventory(null, size, plugin.legacy(config().getString(base + ".title", "Create Command Item")));
         decorationApplier.accept(inv, base);
 
         Map<String, String> placeholders = new HashMap<>();
@@ -170,11 +170,11 @@ final class MailCreationViewBuilder {
         if (headMeta == null) {
             return;
         }
-        headMeta.setDisplayName(plugin.colorize(config().getString(path + ".name")));
+        headMeta.setDisplayName(plugin.legacy(config().getString(path + ".name")));
         List<String> headLore = viewer.hasPermission(config().getString("settings.admin-permission")) ?
                 config().getStringList(path + ".adminlore") :
                 config().getStringList(path + ".lore");
-        List<String> lore = headLore.stream().map(plugin::colorize).collect(Collectors.toList());
+        List<String> lore = headLore.stream().map(plugin::legacy).collect(Collectors.toList());
         if (session.getReceiver() != null) {
             lore.add(plugin.getMessage(path + ".current-receiver-format",
                     plugin.placeholders("receiver", session.getReceiver())));
@@ -195,14 +195,14 @@ final class MailCreationViewBuilder {
         if (paperMeta == null) {
             return;
         }
-        paperMeta.setDisplayName(plugin.colorize(config().getString(path + ".name")));
+        paperMeta.setDisplayName(plugin.legacy(config().getString(path + ".name")));
         List<String> paperLore = config().getStringList(path + ".lore").stream()
-                .map(plugin::colorize)
+                .map(plugin::legacy)
                 .collect(Collectors.toList());
         if (session.getMessage() != null) {
-            paperLore.add(plugin.colorize(config().getString(path + ".current-message-prefix")));
+            paperLore.add(plugin.legacy(config().getString(path + ".current-message-prefix")));
             paperLore.addAll(Arrays.stream(session.getMessage().split("\n"))
-                    .map(line -> plugin.colorize(config().getString(path + ".message-line-format") + line))
+                    .map(line -> plugin.legacy(config().getString(path + ".message-line-format") + line))
                     .collect(Collectors.toList()));
         }
         paperMeta.setLore(paperLore);
@@ -227,9 +227,9 @@ final class MailCreationViewBuilder {
         if (chestMeta == null) {
             return;
         }
-        chestMeta.setDisplayName(plugin.colorize(config().getString(path + ".name")));
+        chestMeta.setDisplayName(plugin.legacy(config().getString(path + ".name")));
         chestMeta.setLore(config().getStringList(path + ".lore").stream()
-                .map(plugin::colorize)
+                .map(plugin::legacy)
                 .collect(Collectors.toList()));
         itemStyler.apply(chestMeta, path);
         chest.setItemMeta(chestMeta);
@@ -246,9 +246,9 @@ final class MailCreationViewBuilder {
         if (sendMeta == null) {
             return;
         }
-        sendMeta.setDisplayName(plugin.colorize(config().getString(path + ".name")));
+        sendMeta.setDisplayName(plugin.legacy(config().getString(path + ".name")));
         sendMeta.setLore(config().getStringList(path + ".lore").stream()
-                .map(plugin::colorize)
+                .map(plugin::legacy)
                 .collect(Collectors.toList()));
         itemStyler.apply(sendMeta, path);
         sendButton.setItemMeta(sendMeta);
@@ -288,7 +288,7 @@ final class MailCreationViewBuilder {
             return clock;
         }
 
-        clockMeta.setDisplayName(plugin.colorize(config().getString(basePath + ".name")));
+        clockMeta.setDisplayName(plugin.legacy(config().getString(basePath + ".name")));
 
         String scheduleTime = session.getScheduleDate() != null
                 ? DATE_FORMAT.format(new Date(session.getScheduleDate()))
@@ -301,7 +301,7 @@ final class MailCreationViewBuilder {
                 .map(line -> plugin.applyPlaceholderVariants(line, Map.of(
                         "schedule_time", scheduleTime,
                         "expire_time", expireTime)))
-                .map(plugin::colorize)
+                .map(plugin::legacy)
                 .collect(Collectors.toList());
         clockMeta.setLore(lore);
         itemStyler.apply(clockMeta, basePath);
@@ -338,9 +338,9 @@ final class MailCreationViewBuilder {
                     if (meta == null) {
                         continue;
                     }
-                    meta.setDisplayName(plugin.colorize(config.getString(base + ".name", " ")));
+                    meta.setDisplayName(plugin.legacy(config.getString(base + ".name", " ")));
                     meta.setLore(config.getStringList(base + ".lore").stream()
-                            .map(plugin::colorize)
+                            .map(plugin::legacy)
                             .collect(Collectors.toList()));
                     filler.setItemMeta(meta);
                     return filler;

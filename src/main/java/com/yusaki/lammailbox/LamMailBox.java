@@ -83,7 +83,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
     private boolean mailingAutoCleanup;
     private CronParser cronParser;
     private CronDescriptor cronDescriptor;
-    private final LegacyComponentSerializer legacySerializer = LegacyComponentSerializer.legacyAmpersand();
+    private static final LegacyComponentSerializer LEGACY_SERIALIZER = LegacyComponentSerializer.legacyAmpersand();
     private Component cachedPrefixComponent;
     private String cachedPrefixLegacy;
 
@@ -525,43 +525,72 @@ public class LamMailBox extends JavaPlugin implements Listener {
         return messageManager;
     }
 
+    public YskLib getYskLib() {
+        return yskLib;
+    }
+
     public void invalidatePrefixCache() {
         cachedPrefixComponent = null;
         cachedPrefixLegacy = null;
     }
 
     public Component deserializeLegacy(String text) {
-        return legacySerializer.deserialize(text == null ? "" : text);
+        if (yskLib != null) {
+            return yskLib.colorizeComponent(text);
+        }
+        return LEGACY_SERIALIZER.deserialize(text == null ? "" : text);
     }
 
     public String legacy(String text) {
         if (text == null || text.isEmpty()) {
             return "";
         }
-        return legacySerializer.serialize(deserializeLegacy(text));
+        if (yskLib != null) {
+            return yskLib.colorizeLegacy(text);
+        }
+        return LEGACY_SERIALIZER.serialize(deserializeLegacy(text));
+    }
+
+    public String legacy(Component component) {
+        if (component == null) {
+            return "";
+        }
+        if (yskLib != null) {
+            return yskLib.colorizeLegacy(component);
+        }
+        return LEGACY_SERIALIZER.serialize(component);
     }
 
     public Component getPrefixComponent() {
         if (cachedPrefixComponent == null) {
-            cachedPrefixComponent = deserializeLegacy(messageManager.getPrefix(this));
+            cachedPrefixComponent = messageManager == null
+                    ? Component.empty()
+                    : messageManager.getPrefixComponent(this);
         }
         return cachedPrefixComponent;
     }
 
     public String getPrefixLegacy() {
         if (cachedPrefixLegacy == null) {
-            cachedPrefixLegacy = legacy(messageManager.getPrefix(this));
+            cachedPrefixLegacy = messageManager == null
+                    ? ""
+                    : messageManager.getPrefix(this);
         }
         return cachedPrefixLegacy;
     }
 
     public Component prefixed(Component body) {
-        return getPrefixComponent().append(body == null ? Component.empty() : body);
+        Component prefix = getPrefixComponent();
+        Component target = body == null ? Component.empty() : body;
+        if (prefix == null || prefix.equals(Component.empty())) {
+            return target;
+        }
+        return prefix.append(target);
     }
 
     public String prefixedLegacy(String body) {
         Component component = body == null ? Component.empty() : deserializeLegacy(body);
-        return legacySerializer.serialize(prefixed(component));
+        return legacy(prefixed(component));
     }
 
     public void sendPrefixedMessage(org.bukkit.command.CommandSender sender, String key) {
@@ -703,7 +732,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
         // Title notification
         if (config.getBoolean("settings.notification.title-enabled")) {
-            yskLib.messageManager.sendTitle(
+            messageManager.sendTitle(
                     this,
                     receiver,
                     "titles.notification.title",

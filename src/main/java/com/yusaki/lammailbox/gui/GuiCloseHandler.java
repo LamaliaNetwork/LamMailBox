@@ -30,9 +30,9 @@ final class GuiCloseHandler {
         String title = event.getView().getTitle();
         UUID playerId = player.getUniqueId();
 
-        if (title.equals(plugin.colorize(config().getString("gui.items.title")))) {
+        if (title.equals(plugin.legacy(config().getString("gui.items.title")))) {
             handleItemsClose(event, player);
-        } else if (title.equals(plugin.colorize(config().getString("gui.create-mail.title")))) {
+        } else if (title.equals(plugin.legacy(config().getString("gui.create-mail.title")))) {
             handleCreateMailClose(player);
         }
 
@@ -85,8 +85,8 @@ final class GuiCloseHandler {
     }
 
     private void handleMainGuiClose(Player player, String title) {
-        String mainTitle = plugin.colorize(config().getString("gui.main.title"));
-        String mainViewingPrefix = plugin.colorize(config().getString("gui.main.title") + " &7(as ");
+        String mainTitle = plugin.legacy(config().getString("gui.main.title"));
+        String mainViewingPrefix = plugin.legacy(config().getString("gui.main.title") + " &7(as ");
         if (!title.equals(mainTitle) && !title.startsWith(mainViewingPrefix)) {
             return;
         }
@@ -109,8 +109,8 @@ final class GuiCloseHandler {
     }
 
     private void handleSentGuiClose(Player player, String title) {
-        String sentTitle = plugin.colorize(config().getString("gui.sent-mail.title"));
-        String sentViewingPrefix = plugin.colorize(config().getString("gui.sent-mail.title") + " &7(as ");
+        String sentTitle = plugin.legacy(config().getString("gui.sent-mail.title"));
+        String sentViewingPrefix = plugin.legacy(config().getString("gui.sent-mail.title") + " &7(as ");
         if (!title.equals(sentTitle) && !title.startsWith(sentViewingPrefix)) {
             return;
         }
@@ -131,7 +131,7 @@ final class GuiCloseHandler {
     }
 
     private void handleMailViewClose(Player player, String title) {
-        String mailViewTitle = plugin.colorize(config().getString("gui.mail-view.title"));
+        String mailViewTitle = plugin.legacy(config().getString("gui.mail-view.title"));
         if (!title.equals(mailViewTitle)) {
             return;
         }

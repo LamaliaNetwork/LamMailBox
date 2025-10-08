@@ -119,7 +119,7 @@ final class CommandItemsClickActions {
                     : draft != null && draft.removeLastCommand();
             String messageKey = isLore ? (removed ? "messages.command-item-lore-removed" : "messages.command-item-lore-empty")
                     : (removed ? "messages.command-item-command-removed" : "messages.command-item-command-empty");
-            player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
+            player.sendMessage(plugin.legacy(config().getString("messages.prefix") +
                     config().getString(messageKey)));
             plugin.openCommandItemCreator(player);
         } else {
@@ -135,7 +135,7 @@ final class CommandItemsClickActions {
         if (event.isRightClick()) {
             if (draft != null) {
                 draft.customModelData(null);
-                player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
+                player.sendMessage(plugin.legacy(config().getString("messages.prefix") +
                         config().getString("messages.command-item-model-cleared")));
             }
             plugin.openCommandItemCreator(player);
@@ -166,7 +166,7 @@ final class CommandItemsClickActions {
         plugin.getInMailCreation().put(player.getUniqueId(), true);
         plugin.getMailCreationController().showInputTitle(player, titleKey);
         if (message != null) {
-            player.sendMessage(plugin.colorize(config().getString("messages.prefix") + message));
+            player.sendMessage(plugin.legacy(config().getString("messages.prefix") + message));
         }
         player.closeInventory();
     }
