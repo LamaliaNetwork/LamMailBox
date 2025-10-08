@@ -31,7 +31,7 @@ mailings:
     items:
       - "minecraft:cookie 16"  # Give 16 cookies when claiming the mail.
     commands:
-      - "title %player% subtitle {\"text\":\"Check /mailbox for a welcome gift!\",\"color\":\"gold\"}"
+      - "say Welcome %player% to the server!"  # Broadcast welcome message.
     schedule:
       delay-seconds: 10        # Wait 10 seconds after first join before sending.
 
