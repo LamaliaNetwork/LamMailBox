@@ -88,10 +88,6 @@
             <url>https://jitpack.io</url>
         </repository>
         <repository>
-            <id>frep-repo</id>
-            <url>https://repo.frep.me/repository/maven-public/</url>
-        </repository>
-        <repository>
             <id>tcoded-releases</id>
             <url>https://repo.tcoded.com/releases</url>
         </repository>
