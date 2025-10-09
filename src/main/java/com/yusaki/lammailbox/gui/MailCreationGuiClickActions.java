@@ -92,7 +92,7 @@ final class MailCreationGuiClickActions {
         player.closeInventory();
         plugin.getAwaitingInput().put(player.getUniqueId(), "receiver");
         plugin.getMailCreationController().showInputTitle(player, "receiver");
-        player.sendMessage(plugin.colorize(config().getString("messages.enter-receiver")));
+        player.sendMessage(plugin.legacy(config().getString("messages.enter-receiver")));
     }
 
     private void handleMessagePaperClick(Player player) {
@@ -100,13 +100,13 @@ final class MailCreationGuiClickActions {
         player.closeInventory();
         plugin.getAwaitingInput().put(player.getUniqueId(), "message");
         plugin.getMailCreationController().showInputTitle(player, "message");
-        player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
+        player.sendMessage(plugin.legacy(config().getString("messages.prefix") +
                 config().getString("messages.enter-message")));
     }
 
     private void handleItemsChestClick(Player player) {
         if (!player.hasPermission(config().getString("settings.permissions.add-items"))) {
-            player.sendMessage(plugin.colorize(config().getString("messages.no-permission")));
+            player.sendMessage(plugin.legacy(config().getString("messages.no-permission")));
             return;
         }
         plugin.openItemsGUI(player);
@@ -114,7 +114,7 @@ final class MailCreationGuiClickActions {
 
     private void handleCommandItemsClick(Player player) {
         if (!player.hasPermission(config().getString("settings.admin-permission"))) {
-            player.sendMessage(plugin.colorize(config().getString("messages.no-permission")));
+            player.sendMessage(plugin.legacy(config().getString("messages.no-permission")));
             return;
         }
         plugin.openCommandItemsEditor(player);
@@ -138,7 +138,7 @@ final class MailCreationGuiClickActions {
         String messageKey = awaitingKey.equals("expire-date")
                 ? "messages.enter-expire-date"
                 : "messages.enter-schedule-date";
-        player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
+        player.sendMessage(plugin.legacy(config().getString("messages.prefix") +
                 config().getString(messageKey)));
     }
 

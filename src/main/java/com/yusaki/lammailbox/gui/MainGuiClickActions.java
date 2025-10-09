@@ -49,7 +49,7 @@ final class MainGuiClickActions {
         if (isEnabled("gui.main.items.create-mail") &&
                 event.getSlot() == config().getInt("gui.main.items.create-mail.slot")) {
             if (isViewingAsOther(player)) {
-                player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
+                player.sendMessage(plugin.legacy(config().getString("messages.prefix") +
                         config().getString("messages.cannot-create-as-other")));
                 return;
             }

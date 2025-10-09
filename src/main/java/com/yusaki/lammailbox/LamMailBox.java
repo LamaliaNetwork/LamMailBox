@@ -9,12 +9,11 @@ import com.cronutils.parser.CronParser;
 import com.tcoded.folialib.FoliaLib;
 import net.md_5.bungee.api.chat.ClickEvent;
 import net.md_5.bungee.api.chat.TextComponent;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
-import org.bukkit.command.CommandMap;
 import org.bukkit.command.PluginCommand;
-import org.bukkit.command.SimpleCommandMap;
-import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -53,6 +52,7 @@ import com.yusaki.lammailbox.service.MailService;
 import com.yusaki.lammailbox.session.MailCreationSession;
 import com.yusaki.lammailbox.config.MailBoxConfigUpdater;
 import org.yusaki.lib.YskLib;
+import org.yusaki.lib.modules.CommandAliasManager;
 import org.yusaki.lib.modules.MessageManager;
 
 public class LamMailBox extends JavaPlugin implements Listener {
@@ -70,6 +70,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
     private Map<UUID, Integer> mailViewPages;
     private Map<UUID, Integer> mailboxPages;
     private Map<UUID, Integer> sentMailboxPages;
+    private String primaryCommand = "lmb";
     private FoliaLib foliaLib;
     private InventoryClickHandler inventoryClickHandler;
     private MailGuiFactory mailGuiFactory;
@@ -82,6 +83,9 @@ public class LamMailBox extends JavaPlugin implements Listener {
     private boolean mailingAutoCleanup;
     private CronParser cronParser;
     private CronDescriptor cronDescriptor;
+    private static final LegacyComponentSerializer LEGACY_SERIALIZER = LegacyComponentSerializer.legacyAmpersand();
+    private Component cachedPrefixComponent;
+    private String cachedPrefixLegacy;
 
     @Override
     public void onEnable() {
@@ -101,12 +105,13 @@ public class LamMailBox extends JavaPlugin implements Listener {
         // Initialize YskLib MessageManager
         yskLib = (YskLib) getServer().getPluginManager().getPlugin("YskLib");
         if (yskLib == null) {
-            getLogger().severe("YskLib not found! Please install YskLib 1.6.4 or above.");
+            getLogger().severe("YskLib not found! Please install YskLib 1.6.7 or above.");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
         yskLib.loadMessages(this);
         messageManager = yskLib.getMessageManager();
+        invalidatePrefixCache();
 
         StorageSettings storageSettings = StorageSettings.load(this);
         mailRepository = createRepository(storageSettings);
@@ -122,7 +127,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
         inventoryClickHandler = new InventoryClickHandler(this);
         mailGuiFactory = new ConfigMailGuiFactory(this);
         mailCreationController = new MailCreationController(this);
-        applyCommandAliases();
+        updateCommandAliases();
 
         mailingConfigLoader = new MailingConfigLoader(this);
         mailingConfigLoader.saveDefaultIfMissing();
@@ -143,7 +148,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
         getCommand("lmbreload").setExecutor((sender, cmd, label, args) -> {
             if (!sender.hasPermission(config.getString("settings.permissions.reload"))) {
-                sender.sendMessage(colorize(config.getString("messages.no-permission")));
+                sendPrefixedMessage(sender, "messages.no-permission");
                 return true;
             }
 
@@ -151,16 +156,18 @@ public class LamMailBox extends JavaPlugin implements Listener {
             configUpdater.updateConfigs();
             reloadConfig();
             config = getConfig();
+            yskLib.loadMessages(this);
+            messageManager = yskLib.getMessageManager();
+            invalidatePrefixCache();
             mailingAutoCleanup = config.getBoolean("mailings.auto-cleanup", true);
-            applyCommandAliases();
+            updateCommandAliases();
             reloadMailings();
-            sender.sendMessage(colorize(config.getString("messages.reload-success")));
+            sendPrefixedMessage(sender, "messages.reload-success");
 
             List<MailingDefinition> definitions = getMailingDefinitions();
             if (!definitions.isEmpty()) {
                 long activeCount = definitions.stream().filter(MailingDefinition::enabled).count();
-                String summary = config.getString("messages.prefix") + "&7Mailings active: &a" + activeCount + "&7/&f" + definitions.size();
-                sender.sendMessage(colorize(summary));
+                sendPrefixedRaw(sender, "&7Mailings active: &a" + activeCount + "&7/&f" + definitions.size());
 
                 if (activeCount > 0) {
                     int previewLimit = 5;
@@ -172,15 +179,15 @@ public class LamMailBox extends JavaPlugin implements Listener {
                             ? activeIds.subList(0, previewLimit)
                             : activeIds;
                     String idsLine = String.join("&f, ", preview);
-                    String detail = config.getString("messages.prefix") + "&7Active IDs: &f" + idsLine;
+                    String detail = "&7Active IDs: &f" + idsLine;
                     if (activeIds.size() > previewLimit) {
                         detail += " &7(+" + (activeIds.size() - previewLimit) + " more)";
                     }
-                    sender.sendMessage(colorize(detail));
+                    sendPrefixedRaw(sender, detail);
                 }
             } else {
                 String emptyMessage = getMailingsMessage("empty", "&7No mailings configured.");
-                sender.sendMessage(colorize(config.getString("messages.prefix") + emptyMessage));
+                sendPrefixedRaw(sender, emptyMessage);
             }
             return true;
         });
@@ -226,7 +233,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
     public void openMainGUI(Player player) {
         if (!player.hasPermission(config.getString("settings.permissions.open"))) {
-            player.sendMessage(colorize(config.getString("messages.no-permission")));
+            sendPrefixedMessage(player, "messages.no-permission");
             return;
         }
         player.openInventory(mailGuiFactory.createMailbox(player));
@@ -234,8 +241,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
     public void openMailboxAsPlayer(Player admin, Player targetPlayer) {
         if (!admin.hasPermission(config.getString("settings.permissions.view-as"))) {
-            admin.sendMessage(colorize(config.getString("messages.prefix") +
-                    config.getString("messages.no-permission")));
+            sendPrefixedMessage(admin, "messages.no-permission");
             return;
         }
         viewingAsPlayer.put(admin.getUniqueId(), targetPlayer.getName());
@@ -244,7 +250,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
     public void openSentMailGUI(Player player) {
         if (!player.hasPermission(config.getString("settings.permissions.open"))) {
-            player.sendMessage(colorize(config.getString("messages.no-permission")));
+            sendPrefixedMessage(player, "messages.no-permission");
             return;
         }
         player.openInventory(mailGuiFactory.createSentMailbox(player));
@@ -257,7 +263,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
     public void handleSentMailDelete(Player player, String mailId) {
         // Check if player can delete this mail (only admins with delete permission)
         if (!player.hasPermission(config.getString("settings.permissions.delete"))) {
-            player.sendMessage(colorize(config.getString("messages.prefix") + config.getString("messages.no-permission")));
+            sendPrefixedMessage(player, "messages.no-permission");
             return;
         }
 
@@ -269,17 +275,17 @@ public class LamMailBox extends JavaPlugin implements Listener {
             
             player.closeInventory();
             openSentMailGUI(player);
-            player.sendMessage(colorize(config.getString("messages.prefix") + config.getString("messages.mail-deleted")));
+            sendPrefixedMessage(player, "messages.mail-deleted");
         } else {
             // First click - ask for confirmation
             deleteConfirmations.put(player.getUniqueId(), mailId);
-            player.sendMessage(colorize(config.getString("messages.prefix") + config.getString("messages.delete-confirmation")));
+            sendPrefixedMessage(player, "messages.delete-confirmation");
         }
     }
 
     public void openCreateMailGUI(Player player) {
         if (!player.hasPermission(config.getString("settings.permissions.compose"))) {
-            player.sendMessage(colorize(config.getString("messages.prefix") + config.getString("messages.no-permission")));
+            sendPrefixedMessage(player, "messages.no-permission");
             return;
         }
         player.openInventory(mailGuiFactory.createMailCreation(player));
@@ -292,8 +298,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
     public void openCommandItemsEditor(Player player) {
         if (!player.hasPermission(config.getString("settings.admin-permission"))) {
-            player.sendMessage(colorize(config.getString("messages.prefix") +
-                    config.getString("messages.no-permission")));
+            sendPrefixedMessage(player, "messages.no-permission");
             return;
         }
         inMailCreation.put(player.getUniqueId(), true);
@@ -302,8 +307,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
     public void openCommandItemCreator(Player player) {
         if (!player.hasPermission(config.getString("settings.admin-permission"))) {
-            player.sendMessage(colorize(config.getString("messages.prefix") +
-                    config.getString("messages.no-permission")));
+            sendPrefixedMessage(player, "messages.no-permission");
             return;
         }
         inMailCreation.put(player.getUniqueId(), true);
@@ -487,8 +491,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
     public void handleMailSend(Player sender) {
         MailCreationSession session = mailSessions.get(sender.getUniqueId());
         if (session == null || !session.isComplete()) {
-            sender.sendMessage(colorize(config.getString("messages.prefix") +
-                    config.getString("messages.incomplete-mail")));
+            sendPrefixedMessage(sender, "messages.incomplete-mail");
             return;
         }
 
@@ -498,8 +501,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
         try {
             delivery = mailService.sendMail(sender, session);
         } catch (IllegalArgumentException ex) {
-            sender.sendMessage(colorize(config.getString("messages.prefix") +
-                    config.getString("messages.incomplete-mail")));
+            sendPrefixedMessage(sender, "messages.incomplete-mail");
             return;
         }
 
@@ -512,22 +514,102 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
         Long scheduleDate = session.getScheduleDate();
         if (scheduleDate != null && scheduleDate > System.currentTimeMillis()) {
-            sender.sendMessage(colorize(config.getString("messages.prefix") +
-                    applyPlaceholderVariants(config.getString("messages.schedule-set"),
-                            "date",
-                            new Date(scheduleDate).toString())));
+            sendPrefixedMessage(sender, "messages.schedule-set",
+                    placeholders("date", new Date(scheduleDate).toString()));
         } else {
-            sender.sendMessage(colorize(config.getString("messages.prefix") +
-                    config.getString("messages.mail-sent")));
+            sendPrefixedMessage(sender, "messages.mail-sent");
         }
     }
 
-    /**
-     * @deprecated Use getMessage() with MessageManager instead
-     */
-    @Deprecated
-    public String colorize(String text) {
-        return text.replace("&", "§");
+    public MessageManager getMessageManager() {
+        return messageManager;
+    }
+
+    public YskLib getYskLib() {
+        return yskLib;
+    }
+
+    public void invalidatePrefixCache() {
+        cachedPrefixComponent = null;
+        cachedPrefixLegacy = null;
+    }
+
+    public Component deserializeLegacy(String text) {
+        if (yskLib != null) {
+            return yskLib.colorizeComponent(text);
+        }
+        return LEGACY_SERIALIZER.deserialize(text == null ? "" : text);
+    }
+
+    public String legacy(String text) {
+        if (text == null || text.isEmpty()) {
+            return "";
+        }
+        if (yskLib != null) {
+            return yskLib.colorizeLegacy(text);
+        }
+        return LEGACY_SERIALIZER.serialize(deserializeLegacy(text));
+    }
+
+    public String legacy(Component component) {
+        if (component == null) {
+            return "";
+        }
+        if (yskLib != null) {
+            return yskLib.colorizeLegacy(component);
+        }
+        return LEGACY_SERIALIZER.serialize(component);
+    }
+
+    public Component getPrefixComponent() {
+        if (cachedPrefixComponent == null) {
+            cachedPrefixComponent = messageManager == null
+                    ? Component.empty()
+                    : messageManager.getPrefixComponent(this);
+        }
+        return cachedPrefixComponent;
+    }
+
+    public String getPrefixLegacy() {
+        if (cachedPrefixLegacy == null) {
+            cachedPrefixLegacy = messageManager == null
+                    ? ""
+                    : messageManager.getPrefix(this);
+        }
+        return cachedPrefixLegacy;
+    }
+
+    public Component prefixed(Component body) {
+        Component prefix = getPrefixComponent();
+        Component target = body == null ? Component.empty() : body;
+        if (prefix == null || prefix.equals(Component.empty())) {
+            return target;
+        }
+        return prefix.append(target);
+    }
+
+    public String prefixedLegacy(String body) {
+        Component component = body == null ? Component.empty() : deserializeLegacy(body);
+        return legacy(prefixed(component));
+    }
+
+    public void sendPrefixedMessage(org.bukkit.command.CommandSender sender, String key) {
+        messageManager.sendPrefixedMessage(this, sender, key);
+    }
+
+    public void sendPrefixedMessage(org.bukkit.command.CommandSender sender, String key, Map<String, String> placeholders) {
+        messageManager.sendPrefixedMessage(this, sender, key, placeholders);
+    }
+
+    public void sendPrefixedMessageList(org.bukkit.command.CommandSender sender, String key) {
+        messageManager.sendPrefixedMessageList(this, sender, key);
+    }
+
+    public void sendPrefixedRaw(org.bukkit.command.CommandSender sender, String message) {
+        if (message == null || message.isEmpty()) {
+            return;
+        }
+        sender.sendMessage(prefixedLegacy(message));
     }
 
     public String applyPlaceholderVariants(String template, String key, String value) {
@@ -642,7 +724,7 @@ public class LamMailBox extends JavaPlugin implements Listener {
                     "sender",
                     sender);
 
-            TextComponent message = new TextComponent(colorize(config.getString("messages.prefix") + chatMessage));
+            TextComponent message = new TextComponent(prefixedLegacy(chatMessage));
             String command = "/" + getPrimaryCommand() + " view " + mailId;
             message.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command));
             receiver.spigot().sendMessage(message);
@@ -650,20 +732,16 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
         // Title notification
         if (config.getBoolean("settings.notification.title-enabled")) {
-            String title = colorize(applyPlaceholderVariants(
-                    config.getString("titles.notification.title"),
-                    "sender",
-                    sender));
-            String subtitle = colorize(applyPlaceholderVariants(
-                    config.getString("titles.notification.subtitle"),
-                    "sender",
-                    sender));
-
-            int fadeIn = config.getInt("titles.notification.fadein");
-            int stay = config.getInt("titles.notification.stay");
-            int fadeOut = config.getInt("titles.notification.fadeout");
-
-            receiver.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
+            messageManager.sendTitle(
+                    this,
+                    receiver,
+                    "titles.notification.title",
+                    "titles.notification.subtitle",
+                    config.getInt("titles.notification.fadein"),
+                    config.getInt("titles.notification.stay"),
+                    config.getInt("titles.notification.fadeout"),
+                    MessageManager.placeholders("sender", sender)
+            );
         }
 
         // Sound notification
@@ -816,60 +894,26 @@ public class LamMailBox extends JavaPlugin implements Listener {
         getLogger().info("Mailing status cleanup executed for IDs: " + activeIds);
     }
 
-    private void applyCommandAliases() {
-        PluginCommand command = getCommand("lmb");
-        if (command == null) {
-            return;
-        }
-
+    private void updateCommandAliases() {
         FileConfiguration config = getConfig();
-        ConfigurationSection aliasSection = config.getConfigurationSection("settings.command-aliases");
-        List<String> aliases = aliasSection != null ? aliasSection.getStringList("base") : Collections.emptyList();
-        if (aliases == null) {
-            aliases = Collections.emptyList();
-        }
-        command.setAliases(aliases);
+        String primaryPath = "settings.command-aliases.lmb";
+        String legacyPath = "settings.command-aliases.base";
 
-        SimpleCommandMap commandMap = findCommandMap();
-        if (commandMap == null) {
-            getLogger().warning("Unable to re-register command aliases for /lmb; command map not accessible.");
-            return;
-        }
-
-        try {
-            command.unregister(commandMap);
-            commandMap.register(getDescription().getName().toLowerCase(Locale.ROOT), command);
-        } catch (Exception ex) {
-            getLogger().warning("Failed to re-register /lmb aliases: " + ex.getMessage());
-        }
-    }
-
-    private SimpleCommandMap findCommandMap() {
-        CommandMap map = null;
-        try {
-            map = (CommandMap) Bukkit.getServer().getClass().getMethod("getCommandMap").invoke(Bukkit.getServer());
-        } catch (ReflectiveOperationException ignored) {
-        }
-
-        if (map instanceof SimpleCommandMap) {
-            return (SimpleCommandMap) map;
-        }
-
-        try {
-            var field = Bukkit.getServer().getClass().getDeclaredField("commandMap");
-            field.setAccessible(true);
-            map = (CommandMap) field.get(Bukkit.getServer());
-            if (map instanceof SimpleCommandMap) {
-                return (SimpleCommandMap) map;
+        List<String> aliases;
+        if (config.contains(primaryPath)) {
+            aliases = CommandAliasManager.applyAliases(this, "lmb", config, primaryPath);
+            if (aliases.isEmpty() && config.contains(legacyPath)) {
+                aliases = CommandAliasManager.applyAliases(this, "lmb", config, legacyPath);
             }
-        } catch (ReflectiveOperationException ignored) {
+        } else {
+            aliases = CommandAliasManager.applyAliases(this, "lmb", config, legacyPath);
         }
-        return null;
+
+        primaryCommand = aliases.isEmpty() ? "lmb" : aliases.get(0);
     }
 
     private String getPrimaryCommand() {
-        List<String> aliases = config.getStringList("settings.command-aliases.base");
-        return aliases.isEmpty() ? "lmb" : aliases.get(0);
+        return primaryCommand;
     }
 
     public List<MailingDefinition> getMailingDefinitions() {

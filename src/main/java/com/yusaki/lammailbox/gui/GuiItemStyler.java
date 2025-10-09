@@ -46,7 +46,7 @@ final class GuiItemStyler {
         }
 
         List<String> colorized = loreLines.stream()
-                .map(plugin::colorize)
+                .map(plugin::legacy)
                 .collect(Collectors.toList());
         meta.setLore(colorized);
     }

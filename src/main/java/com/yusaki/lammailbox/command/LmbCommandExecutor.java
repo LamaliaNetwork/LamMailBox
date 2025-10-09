@@ -53,15 +53,12 @@ public class LmbCommandExecutor implements CommandExecutor {
     private boolean handleSend(CommandSender sender, String[] args) {
         FileConfiguration config = plugin.getConfig();
         if (!sender.hasPermission(config.getString("settings.admin-permission"))) {
-            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                    config.getString("messages.send-command-admin-only")));
+            plugin.sendPrefixedMessage(sender, "messages.send-command-admin-only");
             return true;
         }
 
         if (args.length < 2) {
-            String usage = config.getString("messages.usage-send",
-                    "&cUsage: /lmb send <users> <message> | [commands] | schedule:YYYY:MM:DD:HH:mm | expire:YYYY:MM:DD:HH:mm");
-            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") + usage));
+            plugin.sendPrefixedMessage(sender, "messages.usage-send");
             return true;
         }
 
@@ -87,8 +84,7 @@ public class LmbCommandExecutor implements CommandExecutor {
                 String dateStr = section.substring(9).trim();
                 scheduleDate = parseDateString(dateStr);
                 if (scheduleDate == null) {
-                    sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                            config.getString("messages.invalid-date-format")));
+                    plugin.sendPrefixedMessage(sender, "messages.invalid-date-format");
                     return true;
                 }
             } else if (section.startsWith("expire:")) {
@@ -96,15 +92,13 @@ public class LmbCommandExecutor implements CommandExecutor {
                 String dateStr = section.substring(7).trim();
                 expireDate = parseDateString(dateStr);
                 if (expireDate == null) {
-                    sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                            config.getString("messages.invalid-date-format")));
+                    plugin.sendPrefixedMessage(sender, "messages.invalid-date-format");
                     return true;
                 }
             } else if (!section.isEmpty()) {
                 // Parse commands section
                 if (sender instanceof Player && !sender.hasPermission(config.getString("settings.admin-permission"))) {
-                    sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                            config.getString("messages.no-permission")));
+                    plugin.sendPrefixedMessage(sender, "messages.no-permission");
                     return true;
                 }
 
@@ -161,19 +155,16 @@ public class LmbCommandExecutor implements CommandExecutor {
                 if (delivery.shouldNotifyNow()) {
                     plugin.dispatchMailNotifications(delivery.getReceiverSpec(), delivery.getMailId(), delivery.getSenderName());
                 }
-                player.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                        config.getString("messages.mail-sent")));
+                plugin.sendPrefixedMessage(player, "messages.mail-sent");
             } else {
                 MailDelivery delivery = plugin.getMailService().sendConsoleMail(sender, session);
                 if (delivery.shouldNotifyNow()) {
                     plugin.dispatchMailNotifications(delivery.getReceiverSpec(), delivery.getMailId(), delivery.getSenderName());
                 }
-                String consoleSent = config.getString("messages.mail-sent-console", "&aMail sent successfully.");
-                sender.sendMessage(plugin.colorize(config.getString("messages.prefix") + consoleSent));
+                plugin.sendPrefixedMessage(sender, "messages.mail-sent-console");
             }
         } catch (IllegalArgumentException ex) {
-            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                    config.getString("messages.incomplete-mail")));
+            plugin.sendPrefixedMessage(sender, "messages.incomplete-mail");
         }
         return true;
     }
@@ -181,13 +172,12 @@ public class LmbCommandExecutor implements CommandExecutor {
     private boolean handleView(CommandSender sender, String[] args) {
         FileConfiguration config = plugin.getConfig();
         if (!(sender instanceof Player)) {
-            sender.sendMessage(plugin.colorize(config.getString("messages.console-only")));
+            plugin.sendPrefixedMessage(sender, "messages.console-only");
             return true;
         }
 
         if (args.length < 2) {
-            String usage = config.getString("messages.usage-view", "&cUsage: /lmb view <mailId>");
-            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") + usage));
+            plugin.sendPrefixedMessage(sender, "messages.usage-view");
             return true;
         }
 
@@ -196,8 +186,7 @@ public class LmbCommandExecutor implements CommandExecutor {
 
         Optional<MailRecord> recordOpt = plugin.getMailRepository().findRecord(mailId);
         if (recordOpt.isEmpty()) {
-            player.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                    config.getString("messages.mail-not-found")));
+            plugin.sendPrefixedMessage(player, "messages.mail-not-found");
             return true;
         }
 
@@ -207,8 +196,7 @@ public class LmbCommandExecutor implements CommandExecutor {
         if (canAccess) {
             plugin.openMailView(player, mailId);
         } else {
-            player.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                    config.getString("messages.mail-no-access")));
+            plugin.sendPrefixedMessage(player, "messages.mail-no-access");
         }
         return true;
     }
@@ -216,34 +204,28 @@ public class LmbCommandExecutor implements CommandExecutor {
     private boolean handleAs(CommandSender sender, String[] args) {
         FileConfiguration config = plugin.getConfig();
         if (!sender.hasPermission(config.getString("settings.permissions.view-as"))) {
-            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                    config.getString("messages.no-permission")));
+            plugin.sendPrefixedMessage(sender, "messages.no-permission");
             return true;
         }
 
         if (args.length < 2) {
-            String usage = config.getString("messages.usage-as", "&cUsage: /lmb as <player>");
-            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") + usage));
+            plugin.sendPrefixedMessage(sender, "messages.usage-as");
             return true;
         }
 
         Player targetPlayer = Bukkit.getPlayer(args[1]);
         if (targetPlayer == null) {
-            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                    config.getString("messages.invalid-receiver")));
+            plugin.sendPrefixedMessage(sender, "messages.invalid-receiver");
             return true;
         }
 
         if (sender instanceof Player) {
             Player admin = (Player) sender;
             plugin.openMailboxAsPlayer(admin, targetPlayer);
-            String message = config.getString("messages.mailbox-opened-as", "&aOpened mailbox as %player%");
-            admin.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                    plugin.applyPlaceholderVariants(message, "player", targetPlayer.getName())));
+            plugin.sendPrefixedMessage(admin, "messages.mailbox-opened-as",
+                    plugin.placeholders("player", targetPlayer.getName()));
         } else {
-            String warning = config.getString("messages.console-gui-warning",
-                    "&cConsole cannot open GUI. Use /lmb <player> instead.");
-            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") + warning));
+            plugin.sendPrefixedMessage(sender, "messages.console-gui-warning");
         }
         return true;
     }
@@ -252,8 +234,7 @@ public class LmbCommandExecutor implements CommandExecutor {
         FileConfiguration config = plugin.getConfig();
         Player target = Bukkit.getPlayer(targetName);
         if (target == null) {
-            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                    config.getString("messages.invalid-receiver")));
+            plugin.sendPrefixedMessage(sender, "messages.invalid-receiver");
             return true;
         }
 
@@ -261,24 +242,21 @@ public class LmbCommandExecutor implements CommandExecutor {
             Player player = (Player) sender;
             String permission = config.getString("settings.permissions.open-others", "lammailbox.open.others");
             if (!player.hasPermission(permission)) {
-                player.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                        config.getString("messages.no-permission")));
+                plugin.sendPrefixedMessage(player, "messages.no-permission");
                 return true;
             }
         }
 
         plugin.openMainGUI(target);
-        String message = config.getString("messages.mailbox-opened-for", "&aOpened mailbox for %player%");
-        sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                plugin.applyPlaceholderVariants(message, "player", target.getName())));
+        plugin.sendPrefixedMessage(sender, "messages.mailbox-opened-for",
+                plugin.placeholders("player", target.getName()));
         return true;
     }
 
     private boolean handleDefault(CommandSender sender) {
         FileConfiguration config = plugin.getConfig();
         if (!(sender instanceof Player)) {
-            String usage = config.getString("messages.usage-default", "&cUsage: /lmb <player>");
-            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") + usage));
+            plugin.sendPrefixedMessage(sender, "messages.usage-default");
             return true;
         }
 
@@ -290,21 +268,19 @@ public class LmbCommandExecutor implements CommandExecutor {
     private boolean handleMailings(CommandSender sender) {
         FileConfiguration config = plugin.getConfig();
         if (!sender.hasPermission(config.getString("settings.admin-permission"))) {
-            sender.sendMessage(plugin.colorize(config.getString("messages.prefix") +
-                    config.getString("messages.no-permission")));
+            plugin.sendPrefixedMessage(sender, "messages.no-permission");
             return true;
         }
 
         List<MailingDefinition> definitions = plugin.getMailingDefinitions();
-        String prefix = config.getString("messages.prefix", "");
         String header = plugin.getMailingsMessage("header", "&6Mailings:");
         String empty = plugin.getMailingsMessage("empty", "&7No mailings configured.");
         if (definitions.isEmpty()) {
-            sender.sendMessage(plugin.colorize(prefix + empty));
+            plugin.sendPrefixedRaw(sender, empty);
             return true;
         }
 
-        sender.sendMessage(plugin.colorize(prefix + header));
+        plugin.sendPrefixedRaw(sender, header);
         var statusRepository = plugin.getMailingStatusRepository();
         var scheduler = plugin.getMailingScheduler();
         String repeatingTemplate = plugin.getMailingsMessage("entry-repeating",
@@ -363,7 +339,7 @@ public class LmbCommandExecutor implements CommandExecutor {
                     "runs", runsSegment,
                     "completed", completedSegment));
 
-            sender.sendMessage(plugin.colorize(prefix + line));
+            plugin.sendPrefixedRaw(sender, line);
         }
         return true;
     }

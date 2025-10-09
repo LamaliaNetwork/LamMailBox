@@ -158,7 +158,7 @@ final class MailViewClickActions {
         player.closeInventory();
         plugin.openMainGUI(player);
         String messageKey = hasRewards ? "messages.items-claimed" : "messages.no-items-in-mail";
-        player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
+        player.sendMessage(plugin.legacy(config().getString("messages.prefix") +
                 config().getString(messageKey)));
     }
 

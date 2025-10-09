@@ -21,40 +21,55 @@ public class MailCreationController {
 
     public void showInputTitle(Player player, String type) {
         String path = "titles.input." + type;
-        String rawTitle = config().getString(path + ".title", config().getString("titles.input.command.title"));
-        String rawSubtitle = config().getString(path + ".subtitle", config().getString("titles.input.command.subtitle"));
-        String title = plugin.colorize(rawTitle != null ? rawTitle : "");
-        String subtitle = plugin.colorize(rawSubtitle != null ? rawSubtitle : "");
-        int fadeIn = config().getInt("titles.input.fadein");
-        int stay = config().getInt("titles.input.stay");
-        int fadeOut = config().getInt("titles.input.fadeout");
-        player.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
+        String titleKey = config().contains(path + ".title") ? path + ".title" : "titles.input.command.title";
+        String subtitleKey = config().contains(path + ".subtitle") ? path + ".subtitle" : "titles.input.command.subtitle";
+
+        plugin.getMessageManager().sendTitle(
+                plugin,
+                player,
+                titleKey,
+                subtitleKey,
+                config().getInt("titles.input.fadein"),
+                config().getInt("titles.input.stay"),
+                config().getInt("titles.input.fadeout"),
+                Collections.emptyMap()
+        );
     }
 
     public void showResponseTitle(Player player, boolean success, String customSubtitle) {
         String type = success ? "success" : "error";
         String titlePath = "titles.response." + type;
-        String title = plugin.colorize(config().getString(titlePath + ".title"));
-        String subtitle = customSubtitle != null ?
-                plugin.colorize(customSubtitle) :
-                plugin.colorize(config().getString(titlePath + ".subtitle"));
-        int fadeIn = config().getInt("titles.response.fadein");
-        int stay = config().getInt("titles.response.stay");
-        int fadeOut = config().getInt("titles.response.fadeout");
-        player.sendTitle(title, subtitle, fadeIn, stay, fadeOut);
+
+        if (customSubtitle != null) {
+            String title = plugin.getMessageManager().getMessage(plugin, titlePath + ".title", Collections.emptyMap());
+            String subtitle = plugin.legacy(customSubtitle);
+            player.sendTitle(title, subtitle,
+                    config().getInt("titles.response.fadein"),
+                    config().getInt("titles.response.stay"),
+                    config().getInt("titles.response.fadeout"));
+        } else {
+            plugin.getMessageManager().sendTitle(
+                    plugin,
+                    player,
+                    titlePath + ".title",
+                    titlePath + ".subtitle",
+                    config().getInt("titles.response.fadein"),
+                    config().getInt("titles.response.stay"),
+                    config().getInt("titles.response.fadeout"),
+                    Collections.emptyMap()
+            );
+        }
     }
 
     public boolean handleReceiverInput(Player sender, String input, MailCreationSession session) {
         if (input.equalsIgnoreCase(sender.getName())) {
-            sender.sendMessage(plugin.colorize(config().getString("messages.prefix") +
-                    config().getString("messages.self-mail")));
+            plugin.sendPrefixedMessage(sender, "messages.self-mail");
             return false;
         }
 
         if (isBulkTarget(input)) {
             if (!sender.hasPermission(config().getString("settings.admin-permission"))) {
-                sender.sendMessage(plugin.colorize(config().getString("messages.prefix") +
-                        config().getString("messages.no-permission")));
+                plugin.sendPrefixedMessage(sender, "messages.no-permission");
                 return false;
             }
             session.setReceiver(input);
@@ -63,8 +78,7 @@ public class MailCreationController {
 
         int currentMails = plugin.getMailRepository().countActiveMailFor(input);
         if (currentMails >= config().getInt("settings.max-mails-per-player")) {
-            sender.sendMessage(plugin.colorize(config().getString("messages.prefix") +
-                    config().getString("messages.mailbox-full")));
+            plugin.sendPrefixedMessage(sender, "messages.mailbox-full");
             return false;
         }
 
@@ -81,7 +95,7 @@ public class MailCreationController {
     public boolean handleCommandItemMaterialInput(Player player, String input, MailCreationSession session) {
         CommandItem.Builder draft = ensureCommandItemDraft(session);
         if (input == null || input.trim().isEmpty()) {
-            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.invalid-material")));
+            plugin.sendPrefixedMessage(player, "messages.invalid-material");
             return false;
         }
 
@@ -98,24 +112,23 @@ public class MailCreationController {
             }
         }
         if (material == null) {
-            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.invalid-material")));
+            plugin.sendPrefixedMessage(player, "messages.invalid-material");
             return false;
         }
         draft.material(material.name());
-        String materialTemplate = config().getString("messages.command-item-material-set", "&a✔ Material set to %material%");
-        player.sendMessage(plugin.colorize(prefix() +
-                plugin.applyPlaceholderVariants(materialTemplate, "material", material.name())));
+        plugin.sendPrefixedMessage(player, "messages.command-item-material-set",
+                plugin.placeholders("material", material.name()));
         return true;
     }
 
     public boolean handleCommandItemNameInput(Player player, String input, MailCreationSession session) {
         CommandItem.Builder draft = ensureCommandItemDraft(session);
         if (input == null || input.trim().isEmpty()) {
-            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-name-failed", "&c✖ Name update failed.")));
+            plugin.sendPrefixedMessage(player, "messages.command-item-name-failed");
             return false;
         }
         draft.displayName(input);
-        player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-name-set", "&a✔ Name updated.")));
+        plugin.sendPrefixedMessage(player, "messages.command-item-name-set");
         return true;
     }
 
@@ -123,37 +136,37 @@ public class MailCreationController {
         CommandItem.Builder draft = ensureCommandItemDraft(session);
         String trimmed = input == null ? "" : input.trim();
         if (trimmed.isEmpty()) {
-            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-lore-failed", "&c✖ Lore update failed")));
+            plugin.sendPrefixedMessage(player, "messages.command-item-lore-failed");
             return false;
         }
         draft.addLoreLine(input);
-        player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-lore-added", "&a✔ Added lore line.")));
+        plugin.sendPrefixedMessage(player, "messages.command-item-lore-added");
         return true;
     }
 
     public boolean handleCommandItemCommandInput(Player player, String input, MailCreationSession session) {
         CommandItem.Builder draft = ensureCommandItemDraft(session);
         if (input == null || input.trim().isEmpty()) {
-            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-command-failed", "&c✖ Command update failed")));
+            plugin.sendPrefixedMessage(player, "messages.command-item-command-failed");
             return false;
         }
         String trimmed = input.startsWith("/") ? input.substring(1) : input;
         draft.addCommand(trimmed);
-        player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-command-added", "&a✔ Added command.")));
+        plugin.sendPrefixedMessage(player, "messages.command-item-command-added");
         return true;
     }
 
     public boolean handleCommandItemCustomModelInput(Player player, String input, MailCreationSession session) {
         CommandItem.Builder draft = ensureCommandItemDraft(session);
         if (input == null) {
-            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-model-invalid", "&c✖ Invalid custom model data.")));
+            plugin.sendPrefixedMessage(player, "messages.command-item-model-invalid");
             return false;
         }
 
         String trimmed = input.trim();
         if (trimmed.isEmpty() || trimmed.equalsIgnoreCase("clear") || trimmed.equalsIgnoreCase("none") || trimmed.equalsIgnoreCase("reset")) {
             draft.customModelData(null);
-            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-model-cleared", "&a✔ Custom model data cleared.")));
+            plugin.sendPrefixedMessage(player, "messages.command-item-model-cleared");
             return true;
         }
 
@@ -163,12 +176,11 @@ public class MailCreationController {
                 throw new NumberFormatException("negative");
             }
             draft.customModelData(value);
-            String template = config().getString("messages.command-item-model-set", "&a✔ Custom model data updated.");
-            String formatted = plugin.applyPlaceholderVariants(template, "value", String.valueOf(value));
-            player.sendMessage(plugin.colorize(prefix() + formatted));
+            plugin.sendPrefixedMessage(player, "messages.command-item-model-set",
+                    plugin.placeholders("value", String.valueOf(value)));
             return true;
         } catch (NumberFormatException ex) {
-            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-model-invalid", "&c✖ Invalid custom model data.")));
+            plugin.sendPrefixedMessage(player, "messages.command-item-model-invalid");
             return false;
         }
     }
@@ -176,12 +188,12 @@ public class MailCreationController {
     public boolean finalizeCommandItem(Player player, MailCreationSession session) {
         CommandItem.Builder draft = session.getCommandItemDraft();
         if (draft == null) {
-            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-no-draft", "&c✖ Nothing to save.")));
+            plugin.sendPrefixedMessage(player, "messages.command-item-no-draft");
             return false;
         }
 
         if (draft.commands().isEmpty()) {
-            player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-requires-command", "&c✖ Add at least one command.")));
+            plugin.sendPrefixedMessage(player, "messages.command-item-requires-command");
             return false;
         }
 
@@ -196,7 +208,7 @@ public class MailCreationController {
         session.setCommandItems(items);
         session.setCommandItemDraft(null);
         session.setCommandItemEditIndex(null);
-        player.sendMessage(plugin.colorize(prefix() + config().getString("messages.command-item-saved", "&a✔ Command item saved!")));
+        plugin.sendPrefixedMessage(player, "messages.command-item-saved");
         return true;
     }
 
@@ -226,19 +238,16 @@ public class MailCreationController {
 
             if (isSchedule) {
                 session.setScheduleDate(timestamp);
-                String template = config().getString("messages.schedule-set");
-                String formatted = plugin.applyPlaceholderVariants(template, "date", calendar.getTime().toString());
-                player.sendMessage(plugin.colorize(config().getString("messages.prefix") + formatted));
+                plugin.sendPrefixedMessage(player, "messages.schedule-set",
+                        plugin.placeholders("date", calendar.getTime().toString()));
             } else {
                 session.setExpireDate(timestamp);
-                String template = config().getString("messages.expire-set");
-                String formatted = plugin.applyPlaceholderVariants(template, "date", calendar.getTime().toString());
-                player.sendMessage(plugin.colorize(config().getString("messages.prefix") + formatted));
+                plugin.sendPrefixedMessage(player, "messages.expire-set",
+                        plugin.placeholders("date", calendar.getTime().toString()));
             }
             return true;
         } catch (Exception e) {
-            player.sendMessage(plugin.colorize(config().getString("messages.prefix") +
-                    config().getString("messages.invalid-date-format")));
+            plugin.sendPrefixedMessage(player, "messages.invalid-date-format");
             return false;
         }
     }
@@ -273,7 +282,4 @@ public class MailCreationController {
         return draft;
     }
 
-    private String prefix() {
-        return config().getString("messages.prefix", "");
-    }
 }

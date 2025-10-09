@@ -44,7 +44,7 @@ final class GuiNavigationHelper {
         }
 
         String name = config.getString(path + ".name", "&cBack");
-        meta.setDisplayName(plugin.colorize(name));
+        meta.setDisplayName(plugin.legacy(name));
 
         itemStyler.apply(meta, path);
         meta.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, action);

@@ -6,7 +6,7 @@
 
     <groupId>com.yusaki</groupId>
     <artifactId>LamMailBox</artifactId>
-    <version>1.5.2</version>
+    <version>1.5.3</version>
     <packaging>jar</packaging>
 
     <name>LamMailBox</name>
@@ -88,10 +88,6 @@
             <url>https://jitpack.io</url>
         </repository>
         <repository>
-            <id>frep-repo</id>
-            <url>https://repo.frep.me/repository/maven-public/</url>
-        </repository>
-        <repository>
             <id>tcoded-releases</id>
             <url>https://repo.tcoded.com/releases</url>
         </repository>
@@ -113,7 +109,7 @@
         <dependency>
             <groupId>org.yusaki</groupId>
             <artifactId>lib</artifactId>
-            <version>1.6.4</version>
+            <version>1.6.7</version>
             <scope>provided</scope>
         </dependency>
         <dependency>

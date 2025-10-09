@@ -58,8 +58,8 @@ public class InventoryClickHandler implements MailInventoryHandler {
         String title = event.getView().getTitle();
         ItemStack clicked = event.getCurrentItem();
 
-        String mainTitle = plugin.colorize(config().getString("gui.main.title"));
-        String mainViewingPrefix = plugin.colorize(config().getString("gui.main.title") + " &7(as ");
+        String mainTitle = plugin.legacy(config().getString("gui.main.title"));
+        String mainViewingPrefix = plugin.legacy(config().getString("gui.main.title") + " &7(as ");
         boolean isMainGUI = title.equals(mainTitle) || title.startsWith(mainViewingPrefix);
 
         if (isMainGUI && event.getClickedInventory() == player.getInventory()) {
@@ -70,22 +70,22 @@ public class InventoryClickHandler implements MailInventoryHandler {
             return;
         }
 
-        String sentTitle = plugin.colorize(config().getString("gui.sent-mail.title"));
-        String sentViewingPrefix = plugin.colorize(config().getString("gui.sent-mail.title") + " &7(as ");
-        String commandItemsTitle = plugin.colorize(config().getString("gui.command-items-editor.title", "Command Items"));
-        String commandItemCreatorTitle = plugin.colorize(config().getString("gui.command-item-creator.title", "Create Command Item"));
+        String sentTitle = plugin.legacy(config().getString("gui.sent-mail.title"));
+        String sentViewingPrefix = plugin.legacy(config().getString("gui.sent-mail.title") + " &7(as ");
+        String commandItemsTitle = plugin.legacy(config().getString("gui.command-items-editor.title", "Command Items"));
+        String commandItemCreatorTitle = plugin.legacy(config().getString("gui.command-item-creator.title", "Create Command Item"));
 
         if (isMainGUI) {
             mainGuiActions.handle(event, player, clicked);
         } else if (title.equals(sentTitle) || title.startsWith(sentViewingPrefix)) {
             sentMailActions.handleListClick(event, player, clicked);
-        } else if (title.equals(plugin.colorize(config().getString("gui.sent-mail-view.title")))) {
+        } else if (title.equals(plugin.legacy(config().getString("gui.sent-mail-view.title")))) {
             sentMailActions.handleDetailClick(event, player, clicked);
-        } else if (title.equals(plugin.colorize(config().getString("gui.create-mail.title")))) {
+        } else if (title.equals(plugin.legacy(config().getString("gui.create-mail.title")))) {
             mailCreationActions.handle(event);
-        } else if (title.equals(plugin.colorize(config().getString("gui.items.title")))) {
+        } else if (title.equals(plugin.legacy(config().getString("gui.items.title")))) {
             itemsGuiActions.handle(event);
-        } else if (title.equals(plugin.colorize(config().getString("gui.mail-view.title")))) {
+        } else if (title.equals(plugin.legacy(config().getString("gui.mail-view.title")))) {
             mailViewActions.handle(event, player, clicked);
         } else if (title.equals(commandItemsTitle)) {
             commandItemsActions.handleEditorClick(event, player, clicked);

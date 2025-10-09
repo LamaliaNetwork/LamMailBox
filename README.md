@@ -1,6 +1,6 @@
 LamMailBox lets admins deliver items and rich-text messages to players who don’t need to be online. It’s a lightweight mailbox system for Paper/Folia 1.20+ that works from commands or plugin triggers.
 
-**Latest release:** v1.5.2
+**Latest release:** v1.5.3
 
 ## Key Features
 
@@ -83,7 +83,7 @@ Need examples or deeper guidance? Check the wiki:
 
 * Paper or Folia 1.20+
 * Java 21 runtime
-* [YskLib](https://github.com/YusakiDev/YskLib/releases) 1.6.4 or above
+* [YskLib](https://github.com/YusakiDev/YskLib/releases) 1.6.7 or above
 
 ## Support
 

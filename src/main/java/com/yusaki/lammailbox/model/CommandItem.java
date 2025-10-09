@@ -65,11 +65,11 @@ public final class CommandItem {
             String name = displayName == null || displayName.isBlank()
                     ? "&6Console Action"
                     : displayName;
-            meta.setDisplayName(plugin.colorize(name));
+            meta.setDisplayName(plugin.legacy(name));
 
             List<String> displayLore = lore.isEmpty() ? Collections.emptyList() : lore;
             List<String> loreLines = displayLore.stream()
-                    .map(plugin::colorize)
+                    .map(plugin::legacy)
                     .toList();
             meta.setLore(loreLines);
             if (customModelData != null) {
