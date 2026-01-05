@@ -21,44 +21,47 @@ public class MailCreationController {
 
     public void showInputTitle(Player player, String type) {
         String path = "titles.input." + type;
-        String titleKey = config().contains(path + ".title") ? path + ".title" : "titles.input.command.title";
-        String subtitleKey = config().contains(path + ".subtitle") ? path + ".subtitle" : "titles.input.command.subtitle";
+        String titleText = config().contains(path + ".title")
+                ? config().getString(path + ".title", "")
+                : config().getString("titles.input.command.title", "");
+        String subtitleText = config().contains(path + ".subtitle")
+                ? config().getString(path + ".subtitle", "")
+                : config().getString("titles.input.command.subtitle", "");
+        int fadeIn = config().getInt("titles.input.fadein", 10);
+        int stay = config().getInt("titles.input.stay", 60);
+        int fadeOut = config().getInt("titles.input.fadeout", 10);
 
-        plugin.getMessageManager().sendTitle(
-                plugin,
-                player,
-                titleKey,
-                subtitleKey,
-                config().getInt("titles.input.fadein"),
-                config().getInt("titles.input.stay"),
-                config().getInt("titles.input.fadeout"),
-                Collections.emptyMap()
-        );
+        player.showTitle(net.kyori.adventure.title.Title.title(
+                plugin.deserializeLegacy(titleText),
+                plugin.deserializeLegacy(subtitleText),
+                net.kyori.adventure.title.Title.Times.times(
+                        java.time.Duration.ofMillis(fadeIn * 50L),
+                        java.time.Duration.ofMillis(stay * 50L),
+                        java.time.Duration.ofMillis(fadeOut * 50L)
+                )
+        ));
     }
 
     public void showResponseTitle(Player player, boolean success, String customSubtitle) {
         String type = success ? "success" : "error";
         String titlePath = "titles.response." + type;
+        String titleText = config().getString(titlePath + ".title", "");
+        String subtitleText = customSubtitle != null
+                ? customSubtitle
+                : config().getString(titlePath + ".subtitle", "");
+        int fadeIn = config().getInt("titles.response.fadein", 10);
+        int stay = config().getInt("titles.response.stay", 40);
+        int fadeOut = config().getInt("titles.response.fadeout", 10);
 
-        if (customSubtitle != null) {
-            String title = plugin.getMessageManager().getMessage(plugin, titlePath + ".title", Collections.emptyMap());
-            String subtitle = plugin.legacy(customSubtitle);
-            player.sendTitle(title, subtitle,
-                    config().getInt("titles.response.fadein"),
-                    config().getInt("titles.response.stay"),
-                    config().getInt("titles.response.fadeout"));
-        } else {
-            plugin.getMessageManager().sendTitle(
-                    plugin,
-                    player,
-                    titlePath + ".title",
-                    titlePath + ".subtitle",
-                    config().getInt("titles.response.fadein"),
-                    config().getInt("titles.response.stay"),
-                    config().getInt("titles.response.fadeout"),
-                    Collections.emptyMap()
-            );
-        }
+        player.showTitle(net.kyori.adventure.title.Title.title(
+                plugin.deserializeLegacy(titleText),
+                plugin.deserializeLegacy(subtitleText),
+                net.kyori.adventure.title.Title.Times.times(
+                        java.time.Duration.ofMillis(fadeIn * 50L),
+                        java.time.Duration.ofMillis(stay * 50L),
+                        java.time.Duration.ofMillis(fadeOut * 50L)
+                )
+        ));
     }
 
     public boolean handleReceiverInput(Player sender, String input, MailCreationSession session) {

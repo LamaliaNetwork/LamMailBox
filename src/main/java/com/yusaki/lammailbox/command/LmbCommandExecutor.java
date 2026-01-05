@@ -14,6 +14,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -286,12 +287,13 @@ public class LmbCommandExecutor implements CommandExecutor {
         String repeatingTemplate = plugin.getMailingsMessage("entry-repeating",
                 "&e• &f%id% &8| %status% &8| &7Schedule: &f%schedule% &8| &7Next: &f%next% &8| &7Last: &f%last%%runs%%completed%");
         String firstJoinTemplate = plugin.getMailingsMessage("entry-first-join",
-                "&e• &f%id% &8| %status% &8| &7Trigger: &fOn first join%completed%");
+                "&e• &f%id% &8| %status% &8| &7Trigger: &fOn first join%delay%%completed%");
         String runsTemplate = plugin.getMailingsMessage("runs", " &8| &7Runs: &f%current%&7/&f%max%");
         String completedTemplate = plugin.getMailingsMessage("completed", " &8| &a✓ Completed");
         String missingValue = plugin.getMailingsMessage("value-missing", "&7—");
         String statusEnabled = plugin.getMailingsMessage("status-enabled", "&aEnabled");
         String statusDisabled = plugin.getMailingsMessage("status-disabled", "&cDisabled");
+        String delayTemplate = plugin.getMailingsMessage("delay", " &8| &7Delay: &f%delay%");
         for (MailingDefinition definition : definitions) {
             String statusText = definition.enabled() ? statusEnabled : statusDisabled;
 
@@ -300,6 +302,7 @@ public class LmbCommandExecutor implements CommandExecutor {
             String lastText = missingValue;
             String runsSegment = "";
             String completedSegment = "";
+            String delaySegment = "";
 
             if (definition.type() == MailingType.REPEATING) {
                 String cronExpression = definition.cronExpression();
@@ -327,6 +330,14 @@ public class LmbCommandExecutor implements CommandExecutor {
                         completedSegment = completedTemplate;
                     }
                 }
+            } else if (definition.type() == MailingType.FIRST_JOIN) {
+                Duration delay = definition.firstJoinDelay();
+                if (delay != null && !delay.isZero() && !delay.isNegative()) {
+                    String formattedDelay = formatDelay(delay);
+                    if (formattedDelay != null && !formattedDelay.isBlank()) {
+                        delaySegment = plugin.applyPlaceholderVariants(delayTemplate, Map.of("delay", formattedDelay));
+                    }
+                }
             }
 
             String template = definition.type() == MailingType.FIRST_JOIN ? firstJoinTemplate : repeatingTemplate;
@@ -337,7 +348,8 @@ public class LmbCommandExecutor implements CommandExecutor {
                     "next", nextText,
                     "last", lastText,
                     "runs", runsSegment,
-                    "completed", completedSegment));
+                    "completed", completedSegment,
+                    "delay", delaySegment));
 
             plugin.sendPrefixedRaw(sender, line);
         }
@@ -376,5 +388,45 @@ public class LmbCommandExecutor implements CommandExecutor {
         } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
             return null;
         }
+    }
+
+    private String formatDelay(Duration delay) {
+        if (delay == null) {
+            return null;
+        }
+        long totalMillis = delay.toMillis();
+        if (totalMillis <= 0) {
+            return null;
+        }
+
+        long days = totalMillis / 86_400_000L;
+        totalMillis %= 86_400_000L;
+        long hours = totalMillis / 3_600_000L;
+        totalMillis %= 3_600_000L;
+        long minutes = totalMillis / 60_000L;
+        totalMillis %= 60_000L;
+        long seconds = totalMillis / 1_000L;
+
+        List<String> parts = new ArrayList<>();
+        if (days > 0) {
+            parts.add(days + "d");
+        }
+        if (hours > 0) {
+            parts.add(hours + "h");
+        }
+        if (minutes > 0) {
+            parts.add(minutes + "m");
+        }
+        if (seconds > 0 && parts.size() < 2) {
+            parts.add(seconds + "s");
+        }
+
+        if (parts.isEmpty()) {
+            return "1s";
+        }
+        if (parts.size() > 2) {
+            return String.join(" ", parts.subList(0, 2));
+        }
+        return String.join(" ", parts);
     }
 }
