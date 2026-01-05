@@ -732,16 +732,21 @@ public class LamMailBox extends JavaPlugin implements Listener {
 
         // Title notification
         if (config.getBoolean("settings.notification.title-enabled")) {
-            messageManager.sendTitle(
-                    this,
-                    receiver,
-                    "titles.notification.title",
-                    "titles.notification.subtitle",
-                    config.getInt("titles.notification.fadein"),
-                    config.getInt("titles.notification.stay"),
-                    config.getInt("titles.notification.fadeout"),
-                    MessageManager.placeholders("sender", sender)
-            );
+            String titleText = config.getString("titles.notification.title", "");
+            String subtitleText = config.getString("titles.notification.subtitle", "")
+                    .replace("%sender%", sender).replace("{sender}", sender);
+            int fadeIn = config.getInt("titles.notification.fadein", 10);
+            int stay = config.getInt("titles.notification.stay", 40);
+            int fadeOut = config.getInt("titles.notification.fadeout", 10);
+            receiver.showTitle(net.kyori.adventure.title.Title.title(
+                    deserializeLegacy(titleText),
+                    deserializeLegacy(subtitleText),
+                    net.kyori.adventure.title.Title.Times.times(
+                            java.time.Duration.ofMillis(fadeIn * 50L),
+                            java.time.Duration.ofMillis(stay * 50L),
+                            java.time.Duration.ofMillis(fadeOut * 50L)
+                    )
+            ));
         }
 
         // Sound notification

@@ -3,6 +3,7 @@ version: '${project.version}'
 main: com.yusaki.lammailbox.LamMailBox
 api-version: '1.20'
 folia-supported: true
+depend: [YskLib]
 author: YusakiDev
 website: https://github.com/LamaliaNetwork/LamMailBox
 description: A secure mailbox system for sending items, messages and commands between players
