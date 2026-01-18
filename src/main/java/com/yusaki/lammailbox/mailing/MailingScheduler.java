@@ -365,6 +365,46 @@ public final class MailingScheduler {
                 .orElseGet(OptionalLong::empty);
     }
 
+    /**
+     * Manually send a mailing to a specified receiver or use the mailing's default receiver.
+     * This works for both enabled and disabled mailings.
+     *
+     * @param mailingId The ID of the mailing to send
+     * @param receiverOverride Optional receiver to override the mailing's default receiver.
+     *                        If null or blank, uses the mailing's configured receiver.
+     * @return Optional containing the MailDelivery if successful, empty if mailing not found or delivery failed
+     */
+    public Optional<MailDelivery> sendMailingManually(String mailingId, String receiverOverride) {
+        if (mailingId == null || mailingId.isBlank()) {
+            return Optional.empty();
+        }
+
+        // Find the mailing definition
+        MailingDefinition definition = definitions.stream()
+                .filter(d -> d.id().equals(mailingId))
+                .findFirst()
+                .orElse(null);
+
+        if (definition == null) {
+            return Optional.empty();
+        }
+
+        // Determine the receiver
+        String receiver = (receiverOverride != null && !receiverOverride.isBlank())
+                ? receiverOverride
+                : resolveReceiver(definition.receiver());
+
+        // Deliver the mailing
+        return deliver(definition, receiver)
+                .map(delivery -> {
+                    plugin.dispatchMailNotifications(
+                            delivery.getReceiverSpec(),
+                            delivery.getMailId(),
+                            definition.sender());
+                    return delivery;
+                });
+    }
+
     private void rebuildSchedules(List<MailingDefinition> updated) {
         List<MailingDefinition> snapshot = Collections.unmodifiableList(new ArrayList<>(updated));
         this.definitions = snapshot;

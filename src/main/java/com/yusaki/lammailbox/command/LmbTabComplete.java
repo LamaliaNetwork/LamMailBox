@@ -40,6 +40,7 @@ public class LmbTabComplete implements TabCompleter {
             if (sender.hasPermission(config.getString("settings.admin-permission"))) {
                 completions.add("send");
                 completions.add("mailings");
+                completions.add("template");
             }
             if (sender.hasPermission(config.getString("settings.permissions.view-as"))) {
                 completions.add("as");
@@ -74,12 +75,40 @@ public class LmbTabComplete implements TabCompleter {
                     }
                     return playerNames;
                 }
+            } else if (Objects.equals(subCommand, "template")) {
+                if (sender.hasPermission(config.getString("settings.admin-permission"))) {
+                    return plugin.getMailingDefinitions().stream()
+                            .map(def -> def.id())
+                            .filter(id -> id.toLowerCase().startsWith(current))
+                            .collect(Collectors.toList());
+                }
             } else {
                 if (sender.hasPermission(config.getString("settings.permissions.open-others"))) {
                     return Bukkit.getOnlinePlayers().stream()
                             .map(Player::getName)
                             .filter(name -> name.toLowerCase().startsWith(current))
                             .collect(Collectors.toList());
+                }
+            }
+        }
+
+        if (args.length == 3) {
+            String subCommand = args[0].toLowerCase();
+            String current = args[2].toLowerCase();
+            if (Objects.equals(subCommand, "template")) {
+                if (sender.hasPermission(config.getString("settings.admin-permission"))) {
+                    List<String> playerNames = Bukkit.getOnlinePlayers().stream()
+                            .map(Player::getName)
+                            .filter(name -> name.toLowerCase().startsWith(current))
+                            .collect(Collectors.toList());
+
+                    if ("all".startsWith(current)) {
+                        playerNames.add("all");
+                    }
+                    if ("allonline".startsWith(current)) {
+                        playerNames.add("allonline");
+                    }
+                    return playerNames;
                 }
             }
         }

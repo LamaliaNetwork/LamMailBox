@@ -46,6 +46,8 @@ public class LmbCommandExecutor implements CommandExecutor {
                 return handleAs(sender, args);
             case "mailings":
                 return handleMailings(sender);
+            case "template":
+                return handleTemplate(sender, Arrays.copyOfRange(args, 1, args.length));
             default:
                 return handleOpenOther(sender, rawSubCommand);
         }
@@ -353,6 +355,36 @@ public class LmbCommandExecutor implements CommandExecutor {
 
             plugin.sendPrefixedRaw(sender, line);
         }
+        return true;
+    }
+
+    private boolean handleTemplate(CommandSender sender, String[] args) {
+        FileConfiguration config = plugin.getConfig();
+        if (!sender.hasPermission(config.getString("settings.admin-permission"))) {
+            plugin.sendPrefixedMessage(sender, "messages.no-permission");
+            return true;
+        }
+
+        if (args.length < 1) {
+            plugin.sendPrefixedMessage(sender, "messages.usage-template");
+            return true;
+        }
+
+        String mailingId = args[0];
+        String receiverOverride = args.length >= 2 ? args[1] : null;
+
+        Optional<com.yusaki.lammailbox.service.MailDelivery> result = plugin.getMailingScheduler()
+                .sendMailingManually(mailingId, receiverOverride);
+
+        if (result.isPresent()) {
+            String receiver = receiverOverride != null ? receiverOverride : "default receiver";
+            plugin.sendPrefixedMessage(sender, "messages.template-sent",
+                    plugin.placeholders("id", mailingId, "receiver", receiver));
+        } else {
+            plugin.sendPrefixedMessage(sender, "messages.template-not-found",
+                    plugin.placeholders("id", mailingId));
+        }
+
         return true;
     }
 
