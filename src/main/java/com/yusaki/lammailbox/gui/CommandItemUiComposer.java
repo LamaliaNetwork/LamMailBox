@@ -211,6 +211,7 @@ final class CommandItemUiComposer {
         String firstCommand = commandCount > 0 ? commandItem.commands().get(0) : "";
         String summary = firstCommand.isEmpty() ? "" : Optional.ofNullable(summarizeCommand(firstCommand)).orElse(firstCommand);
 
+        placeholders.put("{name}", commandItem.displayName() != null ? commandItem.displayName() : "");
         placeholders.put("{commands}", formatList(commandItem.commands(), 3, true));
         placeholders.put("{command_count}", String.valueOf(commandCount));
         placeholders.put("{total}", String.valueOf(commandCount));

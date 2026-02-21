@@ -53,11 +53,15 @@ final class GuiCloseHandler {
         }
 
         List<ItemStack> items = new ArrayList<>();
-        Material saveButtonMaterial = Material.valueOf(config().getString("gui.items.items.save-button.material"));
+        int saveSlot = config().getInt("gui.items.items.save-button.slot");
+        int backSlot = config().getInt("gui.items.items.back-button.slot");
         Inventory inventory = event.getInventory();
         for (int i = 0; i < inventory.getSize(); i++) {
+            if (i == saveSlot || i == backSlot) {
+                continue;
+            }
             ItemStack item = inventory.getItem(i);
-            if (item != null && item.getType() != saveButtonMaterial) {
+            if (item != null && item.getType() != Material.AIR) {
                 items.add(item.clone());
             }
         }

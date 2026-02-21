@@ -67,8 +67,9 @@ final class ItemsGuiClickActions {
     private List<ItemStack> collectItems(Inventory inventory) {
         List<ItemStack> items = new ArrayList<>();
         int saveSlot = config().getInt("gui.items.items.save-button.slot");
+        int backSlot = config().getInt("gui.items.items.back-button.slot");
         for (int i = 0; i < inventory.getSize(); i++) {
-            if (i == saveSlot) {
+            if (i == saveSlot || i == backSlot) {
                 continue;
             }
             ItemStack item = inventory.getItem(i);

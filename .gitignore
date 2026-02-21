@@ -11,3 +11,6 @@ docs/
 AGENTS.md
 
 .factory/
+
+# Auto Claude data directory
+.auto-claude/
