@@ -1,0 +1,10 @@
+steps:
+  - name: build
+    image: maven:3.9-eclipse-temurin-21
+    commands:
+      - git clone --depth 1 https://github.com/YusakiDev/YskLib.git /tmp/YskLib
+      - cd /tmp/YskLib && mvn install -DskipTests -q
+      - cd /woodpecker/src
+      - mvn clean package -DskipTests
+      - echo "Build successful"
+      - ls -la target/*.jar
